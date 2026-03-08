@@ -11,39 +11,48 @@
       max-width: 720px;
       margin: 0 auto;
       padding: 1rem;
+      padding-top: 5rem;
     }
 
-    #messages {
+    #pairs {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-      min-height: 60vh;
+      gap: 0.75rem;
     }
 
-    .message {
+    .pair {
+      border: 1px solid var(--pico-muted-border-color);
+      border-radius: 0.5rem;
+      overflow: hidden;
+    }
+
+    .pair-command {
+      padding: 0.3rem 0.75rem;
+      font-size: 0.8rem;
+      color: var(--pico-muted-color);
+      border-bottom: 1px solid var(--pico-muted-border-color);
+      background: var(--pico-card-sectioning-background-color);
+    }
+
+    .pair-response {
       padding: 0.5rem 0.75rem;
-      border-radius: 0.375rem;
       white-space: pre-wrap;
       word-break: break-word;
-    }
-
-    .message.user {
-      align-self: flex-end;
-      background: var(--pico-primary-background);
-      color: var(--pico-primary-inverse);
-    }
-
-    .message.system {
-      align-self: flex-start;
-      background: var(--pico-card-background-color);
-      color: var(--pico-color);
       font-size: 0.9rem;
     }
 
     #input-row {
       display: flex;
       gap: 0.5rem;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0.75rem 1rem;
+      background: var(--pico-background-color);
+      border-bottom: 1px solid var(--pico-muted-border-color);
     }
 
     #input-row input {
@@ -62,31 +71,26 @@
 
   <script>
     const state = {
-      messages: [
-        { type: 'system', text: 'Welcome to snot. Type a note or /help for commands.' }
-      ],
+      pairs: [],
+      welcomed: true,
       input: '',
     };
 
     const commands = {
-      '/help': () => {
-        addMessage('system', 'Commands:\n  /help — show this help\n  /clear — clear all messages');
+      '/help': (input) => {
+        state.pairs.unshift({ command: input, response: 'Commands:\n  /help — show this help\n  /clear — clear all messages' });
       },
-      '/clear': () => {
-        state.messages = [];
-        addMessage('system', 'Cleared.');
+      '/clear': (input) => {
+        state.pairs = [];
+        state.pairs.unshift({ command: input, response: 'Cleared.' });
       },
     };
-
-    function addMessage(type, text) {
-      state.messages.push({ type, text });
-    }
 
     function handleSubmit() {
       const input = state.input.trim();
       if (!input) return;
 
-      addMessage('user', input);
+      state.welcomed = false;
       state.input = '';
 
       if (input.startsWith('/')) {
@@ -94,20 +98,16 @@
         if (cmd) {
           cmd(input);
         } else {
-          addMessage('system', `Unknown command: ${input.split(' ')[0]}`);
+          state.pairs.unshift({ command: input, response: `Unknown command: ${input.split(' ')[0]}` });
         }
       } else {
-        // plain note — just echoed for now
-        addMessage('system', `Note saved.`);
+        state.pairs.unshift({ command: input, response: 'Note saved.' });
       }
     }
 
     const App = {
       view() {
         return m('main', [
-          m('#messages', state.messages.map((msg, i) =>
-            m('.message', { key: i, class: msg.type }, msg.text)
-          )),
           m('#input-row', [
             m('input', {
               type: 'text',
@@ -119,6 +119,15 @@
             }),
             m('button', { onclick: handleSubmit }, 'Send'),
           ]),
+          state.welcomed
+            ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
+            : null,
+          m('#pairs', state.pairs.map((pair, i) =>
+            m('.pair', { key: i }, [
+              m('.pair-command', pair.command),
+              m('.pair-response', pair.response),
+            ])
+          )),
         ]);
       }
     };
