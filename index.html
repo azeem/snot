@@ -121,7 +121,7 @@
     };
 
     function filteredCommands() {
-      const query = state.input.toLowerCase();
+      const query = state.input.split(' ')[0].toLowerCase();
       return Object.keys(commands).filter(c => c.startsWith(query));
     }
 
@@ -197,11 +197,11 @@
       state.input = '';
 
       if (input.startsWith('/')) {
-        const cmd = commands[input.split(' ')[0]];
+        const cmd = commands[input.split(' ')[0].toLowerCase()];
         if (cmd) {
           cmd(input);
         } else {
-          state.pairs.unshift({ command: input, response: `Unknown command: ${input.split(' ')[0]}` });
+          state.pairs.unshift({ command: input, response: `Unknown command: ${input.split(' ')[0].toLowerCase()}` });
         }
       } else {
         state.pairs.unshift({ command: input, response: 'Note saved.' });
