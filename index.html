@@ -140,6 +140,7 @@
   <script>
     const state = {
       pairs: [],
+      notes: [],
       show_welcome: true,
       input: '',
       autocomplete: false,
@@ -170,12 +171,13 @@
         return;
       }
       const note = createNote(content);
+      state.notes.push(note);
       state.pairs.unshift({ command: displayCommand, response: { type: 'notes', notes: [note] } });
     }
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note' } });
+        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list [n] — list most recent notes' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -184,6 +186,18 @@
       '/note': (input) => {
         const content = input.replace(/^\/note\s*/i, '');
         handleNote(content, input);
+      },
+      '/list': (input) => {
+        const arg = input.replace(/^\/list\s*/i, '').trim();
+        const n = arg ? parseInt(arg, 10) : NaN;
+        const notes = isNaN(n)
+          ? state.notes.slice().reverse()
+          : state.notes.slice(-n).reverse();
+        if (!notes.length) {
+          state.pairs.unshift({ command: input, response: { type: 'text', content: 'No notes yet.' } });
+        } else {
+          state.pairs.unshift({ command: input, response: { type: 'notes', notes } });
+        }
       },
     };
 
