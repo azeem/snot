@@ -177,7 +177,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list [n] — list most recent notes' } });
+        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -188,11 +188,7 @@
         handleNote(content, input);
       },
       '/list': (input) => {
-        const arg = input.replace(/^\/list\s*/i, '').trim();
-        const n = arg ? parseInt(arg, 10) : NaN;
-        const notes = isNaN(n)
-          ? state.notes.slice().reverse()
-          : state.notes.slice(-n).reverse();
+        const notes = state.notes.slice(-10).reverse();
         if (!notes.length) {
           state.pairs.unshift({ command: input, response: { type: 'text', content: 'No notes yet.' } });
         } else {
