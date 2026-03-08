@@ -389,7 +389,9 @@
             m('.note-box', {
               onclick: live ? (e) => {
                 e.stopPropagation();
-                state.note_menu = menuOpen ? null : { key: menuKey, noteId: note.id, x: e.clientX, y: e.clientY };
+                if (menuOpen) { state.note_menu = null; return; }
+                const rect = e.currentTarget.getBoundingClientRect();
+                state.note_menu = { key: menuKey, noteId: note.id, right: window.innerWidth - rect.right, top: rect.top };
               } : undefined,
               style: live ? '' : 'cursor: default',
             }, m('.note-content', note.content)),
@@ -442,7 +444,7 @@
             ])
           )),
           menuNote ? m('.note-popup', {
-            style: `right: ${window.innerWidth - menu.x}px; top: ${menu.y + 8}px;`,
+            style: `right: ${menu.right}px; top: ${menu.top}px;`,
             onclick: e => e.stopPropagation(),
           }, [
             m('button', {
