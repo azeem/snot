@@ -12,30 +12,45 @@
       margin: 0 auto;
       padding: 1rem;
       padding-top: 5rem;
+      padding-bottom: 70vh;
     }
 
     #pairs {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
     }
 
-    .pair {
-      border: 1px solid var(--pico-muted-border-color);
-      border-radius: 0.5rem;
-      overflow: hidden;
+    #pairs .pair + .pair {
+      opacity: var(--older-pair-opacity, 0.35);
+      transition: opacity 0.15s;
     }
 
     .pair-command {
-      padding: 0.3rem 0.75rem;
+      padding: 0.3rem 1rem;
+      margin-left: -1rem;
+      margin-right: -1rem;
       font-size: 0.8rem;
       color: var(--pico-muted-color);
-      border-bottom: 1px solid var(--pico-muted-border-color);
       background: var(--pico-card-sectioning-background-color);
+      border-top: 1px solid var(--pico-muted-border-color);
+      border-bottom: 1px solid var(--pico-muted-border-color);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pair-command.expanded {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+      word-break: break-word;
     }
 
     .pair-response {
-      padding: 0.5rem 0.75rem;
+      padding: 0.5rem 0;
+      padding-bottom: 0.75rem;
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 0.9rem;
@@ -96,6 +111,33 @@
     .autocomplete-item.active {
       background: var(--pico-card-sectioning-background-color);
     }
+
+    .note-item {
+      /* spacing between multiple notes */
+    }
+
+    .note-item + .note-item {
+      margin-top: 0.5rem;
+    }
+
+    .note-meta {
+      font-size: 0.7rem;
+      color: var(--pico-muted-color);
+      margin-bottom: 0.15rem;
+      padding-left: 0.15rem;
+    }
+
+    .note-box {
+      background: var(--pico-card-sectioning-background-color);
+      border-radius: 0.375rem;
+      padding: 0.35rem 0.6rem;
+    }
+
+    .note-content {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
@@ -104,19 +146,60 @@
   <script>
     const state = {
       pairs: [],
+      notes: [],
       show_welcome: true,
       input: '',
       autocomplete: false,
       autocomplete_index: 0,
     };
 
+    function formatNoteDate(ts) {
+      const d = new Date(ts);
+      const M = d.getMonth() + 1;
+      const D = d.getDate();
+      const H = d.getHours();
+      const min = String(d.getMinutes()).padStart(2, '0');
+      const hhmm = `${H}${min}`;
+      if (d.getFullYear() === new Date().getFullYear()) {
+        return `${M}/${D} ${hhmm}`;
+      }
+      return `${d.getFullYear()}/${M}/${D} ${hhmm}`;
+    }
+
+    function createNote(content) {
+      return { content, created_at: Date.now() };
+    }
+
+    function handleNote(input, displayCommand) {
+      const content = input.trim();
+      if (!content) {
+        state.pairs.unshift({ command: displayCommand, response: { type: 'text', content: 'Usage: /note <text>' } });
+        return;
+      }
+      const note = createNote(content);
+      state.notes.push(note);
+      state.pairs.unshift({ command: displayCommand, response: { type: 'notes', notes: [note] } });
+    }
+
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ command: input, response: 'Commands:\n  /help — show this help\n  /clear — clear all messages' });
+        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes' } });
       },
       '/clear': () => {
         state.pairs = [];
         state.show_welcome = true;
+      },
+      '/note': (input) => {
+        const content = input.replace(/^\/note\s*/i, '');
+        handleNote(content, input);
+      },
+      '/list': (input) => {
+        const notes = state.notes.slice(-10).reverse();
+        if (!notes.length) {
+          state.pairs.unshift({ command: input, response: { type: 'text', content: 'No notes yet.' } });
+        } else {
+          state.pairs.unshift({ command: input, response: { type: 'notes', notes } });
+        }
       },
     };
 
@@ -201,10 +284,23 @@
         if (cmd) {
           cmd(input);
         } else {
-          state.pairs.unshift({ command: input, response: `Unknown command: ${input.split(' ')[0].toLowerCase()}` });
+          state.pairs.unshift({ command: input, response: { type: 'text', content: `Unknown command: ${input.split(' ')[0].toLowerCase()}` } });
         }
       } else {
-        state.pairs.unshift({ command: input, response: 'Note saved.' });
+        handleNote(input, '/note ' + input);
+      }
+    }
+
+    function renderResponse(response) {
+      if (!response || typeof response === 'string') return response;
+      if (response.type === 'text') return response.content;
+      if (response.type === 'notes') {
+        return response.notes.map(note =>
+          m('.note-item', [
+            m('.note-meta', formatNoteDate(note.created_at)),
+            m('.note-box', m('.note-content', note.content)),
+          ])
+        );
       }
     }
 
@@ -238,8 +334,11 @@
             : null,
           m('#pairs', state.pairs.map((pair, i) =>
             m('.pair', { key: i }, [
-              m('.pair-command', pair.command),
-              m('.pair-response', pair.response),
+              m('.pair-command', {
+                class: pair.expanded ? 'expanded' : '',
+                onclick: () => { pair.expanded = !pair.expanded; },
+              }, pair.command),
+              m('.pair-response', renderResponse(pair.response)),
             ])
           )),
         ]);
@@ -247,6 +346,22 @@
     };
 
     m.mount(document.getElementById('app'), App);
+
+    function updateFadeOpacity() {
+      const firstPair = document.querySelector('#pairs .pair');
+      const pairsEl = document.getElementById('pairs');
+      if (!firstPair || !pairsEl) return;
+      const rect = firstPair.getBoundingClientRect();
+      // visibleRatio: 1 when fully in viewport, 0 when fully scrolled past
+      const visibleRatio = Math.max(0, Math.min(1, rect.bottom / rect.height));
+      const opacity = 0.35 + (1 - visibleRatio) * 0.65;
+      pairsEl.style.setProperty('--older-pair-opacity', opacity);
+    }
+
+    window.addEventListener('scroll', updateFadeOpacity, { passive: true });
+    // Re-run after Mithril redraws so the first pair element exists
+    const _redraw = m.redraw;
+    m.redraw = function() { _redraw.apply(this, arguments); requestAnimationFrame(updateFadeOpacity); };
   </script>
 </body>
 </html>
