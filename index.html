@@ -311,7 +311,11 @@
         note.content = newContent.trim();
         if (collapseCtx) {
           const pair = state.pairs[collapseCtx.pairIdx];
-          if (pair) pair.command = input + '\n' + pair.command;
+          if (pair) {
+            pair.command = input + '\n' + pair.command;
+            state.pairs.splice(collapseCtx.pairIdx, 1);
+            state.pairs.unshift(pair);
+          }
         } else {
           state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
         }
