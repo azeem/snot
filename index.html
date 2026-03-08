@@ -70,9 +70,8 @@
 
   <script>
     const state = {
-      messages: [
-        { type: 'system', text: 'Welcome to snot. Type a note or /help for commands.' }
-      ],
+      messages: [],
+      welcomed: true,
       input: '',
     };
 
@@ -87,13 +86,14 @@
     };
 
     function addMessage(type, text) {
-      state.messages.push({ type, text });
+      state.messages.unshift({ type, text });
     }
 
     function handleSubmit() {
       const input = state.input.trim();
       if (!input) return;
 
+      state.welcomed = false;
       addMessage('user', input);
       state.input = '';
 
@@ -124,6 +124,9 @@
             }),
             m('button', { onclick: handleSubmit }, 'Send'),
           ]),
+          state.welcomed
+            ? m('.message.system', 'Welcome to snot. Type a note or /help for commands.')
+            : null,
           m('#messages', state.messages.map((msg, i) =>
             m('.message', { key: i, class: msg.type }, msg.text)
           )),
