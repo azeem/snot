@@ -107,19 +107,24 @@
     }
 
     .note-item {
-      background: var(--pico-card-sectioning-background-color);
-      border-radius: 0.375rem;
-      padding: 0.35rem 0.6rem;
+      /* spacing between multiple notes */
     }
 
     .note-item + .note-item {
-      margin-top: 0.4rem;
+      margin-top: 0.5rem;
     }
 
     .note-meta {
-      font-size: 0.72rem;
+      font-size: 0.7rem;
       color: var(--pico-muted-color);
       margin-bottom: 0.15rem;
+      padding-left: 0.15rem;
+    }
+
+    .note-box {
+      background: var(--pico-card-sectioning-background-color);
+      border-radius: 0.375rem;
+      padding: 0.35rem 0.6rem;
     }
 
     .note-content {
@@ -143,9 +148,15 @@
 
     function formatNoteDate(ts) {
       const d = new Date(ts);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        + ' · '
-        + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const M = d.getMonth() + 1;
+      const D = d.getDate();
+      const H = d.getHours();
+      const min = String(d.getMinutes()).padStart(2, '0');
+      const hhmm = `${H}${min}`;
+      if (d.getFullYear() === new Date().getFullYear()) {
+        return `${M}/${D} ${hhmm}`;
+      }
+      return `${d.getFullYear()}/${M}/${D} ${hhmm}`;
     }
 
     function createNote(content) {
@@ -271,7 +282,7 @@
         return response.notes.map(note =>
           m('.note-item', [
             m('.note-meta', formatNoteDate(note.created_at)),
-            m('.note-content', note.content),
+            m('.note-box', m('.note-content', note.content)),
           ])
         );
       }
