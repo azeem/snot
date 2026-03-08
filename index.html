@@ -127,12 +127,27 @@
       background: var(--pico-card-sectioning-background-color);
       border-radius: 0.375rem;
       padding: 0.35rem 0.6rem;
+      cursor: pointer;
+      user-select: none;
     }
 
     .note-content {
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 0.9rem;
+      pointer-events: none;
+    }
+
+    .note-menu {
+      display: flex;
+      gap: 0.4rem;
+      margin-top: 0.3rem;
+    }
+
+    .note-menu button {
+      font-size: 0.75rem;
+      padding: 0.15rem 0.6rem;
+      margin: 0;
     }
   </style>
 </head>
@@ -180,6 +195,7 @@
       input: '',
       autocomplete: false,
       autocomplete_index: 0,
+      note_menu: null,
     };
 
     function formatNoteDate(ts) {
@@ -348,12 +364,31 @@
       if (!response || typeof response === 'string') return response;
       if (response.type === 'text') return response.content;
       if (response.type === 'notes') {
-        return response.notes.map(note =>
-          m('.note-item', [
+        return response.notes.map(note => {
+          const live = state.notes.find(n => n.id === note.id);
+          const menuOpen = state.note_menu === note.id;
+          return m('.note-item', [
             m('.note-meta', formatNoteDate(note.created_at)),
-            m('.note-box', m('.note-content', note.content)),
-          ])
-        );
+            m('.note-box', {
+              onclick: live ? (e) => {
+                e.stopPropagation();
+                state.note_menu = menuOpen ? null : note.id;
+              } : undefined,
+              style: live ? '' : 'cursor: default',
+            }, m('.note-content', note.content)),
+            menuOpen ? m('.note-menu', [
+              m('button', {
+                onclick: (e) => {
+                  e.stopPropagation();
+                  state.input = `/edit ${note.id.slice(0, 7)} ${note.content}`;
+                  state.note_menu = null;
+                  const inp = document.querySelector('#input-row input');
+                  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+                },
+              }, 'Edit'),
+            ]) : null,
+          ]);
+        });
       }
     }
 
@@ -419,6 +454,10 @@
       const opacity = 0.35 + (1 - visibleRatio) * 0.65;
       pairsEl.style.setProperty('--older-pair-opacity', opacity);
     }
+
+    document.addEventListener('click', () => {
+      if (state.note_menu) { state.note_menu = null; m.redraw(); }
+    });
 
     window.addEventListener('scroll', updateFadeOpacity, { passive: true });
     // Re-run after Mithril redraws so the first pair element exists
