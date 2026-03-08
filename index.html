@@ -64,6 +64,38 @@
       margin: 0;
       width: auto;
     }
+
+    #input-wrapper {
+      flex: 1;
+      position: relative;
+    }
+
+    #input-wrapper input {
+      width: 100%;
+    }
+
+    #autocomplete {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: var(--pico-background-color);
+      border: 1px solid var(--pico-muted-border-color);
+      border-radius: 0.5rem;
+      overflow: hidden;
+      z-index: 100;
+    }
+
+    .autocomplete-item {
+      padding: 0.4rem 0.75rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .autocomplete-item:hover,
+    .autocomplete-item.active {
+      background: var(--pico-card-sectioning-background-color);
+    }
   </style>
 </head>
 <body>
@@ -74,6 +106,8 @@
       pairs: [],
       show_welcome: true,
       input: '',
+      autocomplete: false,
+      autocomplete_index: 0,
     };
 
     const commands = {
@@ -86,10 +120,79 @@
       },
     };
 
+    function filteredCommands() {
+      const query = state.input.toLowerCase();
+      return Object.keys(commands).filter(c => c.startsWith(query));
+    }
+
+    function dismissAutocomplete() {
+      state.autocomplete = false;
+      state.autocomplete_index = 0;
+    }
+
+    function selectCommand(cmd) {
+      state.input = cmd + ' ';
+      dismissAutocomplete();
+    }
+
+    function handleInput(e) {
+      const val = e.target.value;
+      // Space as first character: replace with / and show autocomplete
+      if (val === ' ') {
+        state.input = '/';
+        state.autocomplete = true;
+        state.autocomplete_index = 0;
+        m.redraw();
+        return;
+      }
+      state.input = val;
+      // Show/update autocomplete while typing a command
+      if (state.autocomplete || (val.startsWith('/') && val.indexOf(' ') === -1)) {
+        state.autocomplete = true;
+        state.autocomplete_index = 0;
+      } else {
+        state.autocomplete = false;
+      }
+    }
+
+    function handleKeydown(e) {
+      if (state.autocomplete) {
+        const items = filteredCommands();
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          state.autocomplete_index = (state.autocomplete_index + 1) % items.length;
+          return;
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          state.autocomplete_index = (state.autocomplete_index - 1 + items.length) % items.length;
+          return;
+        }
+        if (e.key === 'Tab' || e.key === 'Enter') {
+          e.preventDefault();
+          if (items.length) selectCommand(items[state.autocomplete_index]);
+          return;
+        }
+        if (e.key === 'Escape') {
+          dismissAutocomplete();
+          return;
+        }
+        // Second space typed immediately after the first (input is currently '/')
+        if (e.key === ' ' && state.input === '/') {
+          e.preventDefault();
+          state.input = ' ';
+          dismissAutocomplete();
+          return;
+        }
+      }
+      if (e.key === 'Enter') handleSubmit();
+    }
+
     function handleSubmit() {
       const input = state.input.trim();
       if (!input) return;
 
+      dismissAutocomplete();
       state.show_welcome = false;
       state.input = '';
 
@@ -107,16 +210,27 @@
 
     const App = {
       view() {
+        const items = state.autocomplete ? filteredCommands() : [];
         return m('main', [
           m('#input-row', [
-            m('input', {
-              type: 'text',
-              placeholder: 'Type a note or /command...',
-              value: state.input,
-              oninput: e => { state.input = e.target.value; },
-              onkeydown: e => { if (e.key === 'Enter') handleSubmit(); },
-              autofocus: true,
-            }),
+            m('#input-wrapper', [
+              m('input', {
+                type: 'text',
+                placeholder: 'Type a note or /command...',
+                value: state.input,
+                oninput: handleInput,
+                onkeydown: handleKeydown,
+                autofocus: true,
+              }),
+              state.autocomplete && items.length
+                ? m('#autocomplete', items.map((cmd, i) =>
+                    m('.autocomplete-item', {
+                      class: i === state.autocomplete_index ? 'active' : '',
+                      onmousedown: e => { e.preventDefault(); selectCommand(cmd); },
+                    }, cmd)
+                  ))
+                : null,
+            ]),
             m('button', { onclick: handleSubmit }, 'Send'),
           ]),
           state.show_welcome
