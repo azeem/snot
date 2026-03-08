@@ -195,8 +195,15 @@
       return `${d.getFullYear()}/${M}/${D} ${hhmm}`;
     }
 
+    function generateUUID() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
+        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+      );
+    }
+
     function createNote(content) {
-      return { id: crypto.randomUUID(), content, created_at: Date.now() };
+      return { id: generateUUID(), content, created_at: Date.now() };
     }
 
     function handleNote(input, displayCommand) {
