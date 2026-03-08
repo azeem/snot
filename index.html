@@ -12,11 +12,17 @@
       margin: 0 auto;
       padding: 1rem;
       padding-top: 5rem;
+      padding-bottom: 70vh;
     }
 
     #pairs {
       display: flex;
       flex-direction: column;
+    }
+
+    #pairs .pair + .pair {
+      opacity: var(--older-pair-opacity, 0.35);
+      transition: opacity 0.15s;
     }
 
     .pair-command {
@@ -327,7 +333,7 @@
             ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
             : null,
           m('#pairs', state.pairs.map((pair, i) =>
-            m('.pair', { key: i, style: i > 0 ? 'opacity: 0.35' : '' }, [
+            m('.pair', { key: i }, [
               m('.pair-command', {
                 class: pair.expanded ? 'expanded' : '',
                 onclick: () => { pair.expanded = !pair.expanded; },
@@ -340,6 +346,22 @@
     };
 
     m.mount(document.getElementById('app'), App);
+
+    function updateFadeOpacity() {
+      const firstPair = document.querySelector('#pairs .pair');
+      const pairsEl = document.getElementById('pairs');
+      if (!firstPair || !pairsEl) return;
+      const rect = firstPair.getBoundingClientRect();
+      // visibleRatio: 1 when fully in viewport, 0 when fully scrolled past
+      const visibleRatio = Math.max(0, Math.min(1, rect.bottom / rect.height));
+      const opacity = 0.35 + (1 - visibleRatio) * 0.65;
+      pairsEl.style.setProperty('--older-pair-opacity', opacity);
+    }
+
+    window.addEventListener('scroll', updateFadeOpacity, { passive: true });
+    // Re-run after Mithril redraws so the first pair element exists
+    const _redraw = m.redraw;
+    m.redraw = function() { _redraw.apply(this, arguments); requestAnimationFrame(updateFadeOpacity); };
   </script>
 </body>
 </html>
