@@ -17,25 +17,34 @@
     #pairs {
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .pair {
-      border: 1px solid var(--pico-muted-border-color);
-      border-radius: 0.5rem;
-      overflow: hidden;
     }
 
     .pair-command {
-      padding: 0.3rem 0.75rem;
+      padding: 0.3rem 1rem;
+      margin-left: -1rem;
+      margin-right: -1rem;
       font-size: 0.8rem;
       color: var(--pico-muted-color);
-      border-bottom: 1px solid var(--pico-muted-border-color);
       background: var(--pico-card-sectioning-background-color);
+      border-top: 1px solid var(--pico-muted-border-color);
+      border-bottom: 1px solid var(--pico-muted-border-color);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .pair-command.expanded {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+      word-break: break-word;
     }
 
     .pair-response {
-      padding: 0.5rem 0.75rem;
+      padding: 0.5rem 0;
+      padding-bottom: 0.75rem;
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 0.9rem;
@@ -298,7 +307,10 @@
             : null,
           m('#pairs', state.pairs.map((pair, i) =>
             m('.pair', { key: i }, [
-              m('.pair-command', pair.command),
+              m('.pair-command', {
+                class: pair.expanded ? 'expanded' : '',
+                onclick: () => { pair.expanded = !pair.expanded; },
+              }, pair.command),
               m('.pair-response', renderResponse(pair.response)),
             ])
           )),
