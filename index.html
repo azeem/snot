@@ -80,9 +80,9 @@
       '/help': (input) => {
         state.pairs.unshift({ command: input, response: 'Commands:\n  /help — show this help\n  /clear — clear all messages' });
       },
-      '/clear': (input) => {
+      '/clear': () => {
         state.pairs = [];
-        state.pairs.unshift({ command: input, response: 'Cleared.' });
+        state.welcomed = true;
       },
     };
 
