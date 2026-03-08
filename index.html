@@ -72,7 +72,7 @@
   <script>
     const state = {
       pairs: [],
-      welcomed: true,
+      show_welcome: true,
       input: '',
     };
 
@@ -82,7 +82,7 @@
       },
       '/clear': () => {
         state.pairs = [];
-        state.welcomed = true;
+        state.show_welcome = true;
       },
     };
 
@@ -90,7 +90,7 @@
       const input = state.input.trim();
       if (!input) return;
 
-      state.welcomed = false;
+      state.show_welcome = false;
       state.input = '';
 
       if (input.startsWith('/')) {
@@ -119,7 +119,7 @@
             }),
             m('button', { onclick: handleSubmit }, 'Send'),
           ]),
-          state.welcomed
+          state.show_welcome
             ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
             : null,
           m('#pairs', state.pairs.map((pair, i) =>
