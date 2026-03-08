@@ -138,14 +138,32 @@
       pointer-events: none;
     }
 
-    .note-menu {
+    .note-popup {
+      position: fixed;
+      background: var(--pico-card-background-color, #fff);
+      border: 1px solid var(--pico-muted-border-color, #ccc);
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      padding: 0.25rem;
+      z-index: 1000;
       display: flex;
-      gap: 0.4rem;
-      margin-top: 0.3rem;
+      flex-direction: column;
+      min-width: 130px;
     }
 
-    .note-menu button {
+    .note-popup button {
       margin: 0;
+      text-align: left;
+      background: none;
+      border: none;
+      border-radius: 0.35rem;
+      padding: 0.4rem 0.75rem;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .note-popup button:hover {
+      background: var(--pico-muted-background-color, #f4f4f4);
     }
   </style>
 </head>
@@ -358,41 +376,38 @@
       }
     }
 
-    function renderResponse(response) {
+    function renderResponse(response, pairIdx) {
       if (!response || typeof response === 'string') return response;
       if (response.type === 'text') return response.content;
       if (response.type === 'notes') {
         return response.notes.map(note => {
           const live = state.notes.find(n => n.id === note.id);
-          const menuOpen = state.note_menu === note.id;
+          const menuKey = `${pairIdx}_${note.id}`;
+          const menuOpen = state.note_menu && state.note_menu.key === menuKey;
           return m('.note-item', [
             m('.note-meta', formatNoteDate(note.created_at)),
             m('.note-box', {
               onclick: live ? (e) => {
                 e.stopPropagation();
-                state.note_menu = menuOpen ? null : note.id;
+                state.note_menu = menuOpen ? null : { key: menuKey, noteId: note.id, x: e.clientX, y: e.clientY };
               } : undefined,
               style: live ? '' : 'cursor: default',
             }, m('.note-content', note.content)),
-            menuOpen ? m('.note-menu', [
-              m('button', {
-                onclick: (e) => {
-                  e.stopPropagation();
-                  state.input = `/edit ${note.id.slice(0, 7)} ${note.content}`;
-                  state.note_menu = null;
-                  const inp = document.querySelector('#input-row input');
-                  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
-                },
-              }, 'Edit'),
-            ]) : null,
           ]);
         });
       }
     }
 
     const App = {
+      oncreate() {
+        document.addEventListener('click', () => {
+          if (state.note_menu) { state.note_menu = null; m.redraw(); }
+        });
+      },
       view() {
         const items = state.autocomplete ? filteredCommands() : [];
+        const menu = state.note_menu;
+        const menuNote = menu && state.notes.find(n => n.id === menu.noteId);
         return m('main', [
           m('#input-row', [
             m('#input-wrapper', [
@@ -423,9 +438,22 @@
                 class: pair.expanded ? 'expanded' : '',
                 onclick: () => { pair.expanded = !pair.expanded; },
               }, pair.command),
-              m('.pair-response', renderResponse(pair.response)),
+              m('.pair-response', renderResponse(pair.response, i)),
             ])
           )),
+          menuNote ? m('.note-popup', {
+            style: `right: ${window.innerWidth - menu.x}px; top: ${menu.y + 8}px;`,
+            onclick: e => e.stopPropagation(),
+          }, [
+            m('button', {
+              onclick: () => {
+                state.input = `/edit ${menuNote.id.slice(0, 7)} ${menuNote.content}`;
+                state.note_menu = null;
+                const inp = document.querySelector('#input-row input');
+                if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+              },
+            }, 'Edit'),
+          ]) : null,
         ]);
       }
     };
