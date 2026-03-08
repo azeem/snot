@@ -42,10 +42,24 @@
     }
 
     .pair-command.expanded {
-      white-space: normal;
+      white-space: pre-line;
       overflow: visible;
       text-overflow: unset;
       word-break: break-word;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--pico-contrast-background, #333);
+      color: var(--pico-contrast-inverse, #fff);
+      padding: 0.45rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      z-index: 2000;
+      pointer-events: none;
     }
 
     .pair-response {
@@ -212,7 +226,17 @@
       autocomplete: false,
       autocomplete_index: 0,
       note_menu: null,
+      collapsing: null,
+      toast: null,
     };
+
+    let _toastTimer = null;
+    function showToast(msg) {
+      state.toast = msg;
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => { state.toast = null; m.redraw(); }, 3000);
+      m.redraw();
+    }
 
     function formatNoteDate(ts) {
       const d = new Date(ts);
@@ -270,20 +294,27 @@
           state.pairs.unshift({ command: input, response: { type: 'notes', notes } });
         }
       },
-      '/edit': (input) => {
+      '/edit': (input, collapseCtx) => {
         const parts = input.replace(/^\/edit\s*/i, '').match(/^(\S+)\s+([\s\S]+)$/);
         if (!parts) {
+          if (collapseCtx) { showToast('Usage: /edit <id> <new text>'); return; }
           state.pairs.unshift({ command: input, response: { type: 'text', content: 'Usage: /edit <id> <new text>' } });
           return;
         }
         const [, shortId, newContent] = parts;
         const note = state.notes.find(n => n.id.startsWith(shortId));
         if (!note) {
+          if (collapseCtx) { showToast(`No note found with id: ${shortId}`); return; }
           state.pairs.unshift({ command: input, response: { type: 'text', content: `No note found with id: ${shortId}` } });
           return;
         }
         note.content = newContent.trim();
-        state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
+        if (collapseCtx) {
+          const pair = state.pairs[collapseCtx.pairIdx];
+          if (pair) pair.command = input + '\n' + pair.command;
+        } else {
+          state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
+        }
         if (db) dbPut(note);
       },
     };
@@ -314,6 +345,10 @@
         return;
       }
       state.input = val;
+      // Clear collapsing tag if user deletes back to bare command word (no space = no args)
+      if (state.collapsing && !val.includes(' ')) {
+        state.collapsing = null;
+      }
       // Show/update autocomplete while typing a command
       if (state.autocomplete || (val.startsWith('/') && val.indexOf(' ') === -1)) {
         state.autocomplete = true;
@@ -360,16 +395,23 @@
       const input = state.input.trim();
       if (!input) return;
 
+      const collapseCtx = state.collapsing;
       dismissAutocomplete();
       state.show_welcome = false;
       state.input = '';
+      state.collapsing = null;
 
       if (input.startsWith('/')) {
-        const cmd = commands[input.split(' ')[0].toLowerCase()];
+        const cmdKey = input.split(' ')[0].toLowerCase();
+        const cmd = commands[cmdKey];
         if (cmd) {
-          cmd(input);
+          cmd(input, collapseCtx);
         } else {
-          state.pairs.unshift({ command: input, response: { type: 'text', content: `Unknown command: ${input.split(' ')[0].toLowerCase()}` } });
+          if (collapseCtx) {
+            showToast(`Unknown command: ${cmdKey}`);
+          } else {
+            state.pairs.unshift({ command: input, response: { type: 'text', content: `Unknown command: ${cmdKey}` } });
+          }
         }
       } else {
         handleNote(input, '/note ' + input);
@@ -391,7 +433,7 @@
                 e.stopPropagation();
                 if (menuOpen) { state.note_menu = null; return; }
                 const rect = e.currentTarget.getBoundingClientRect();
-                state.note_menu = { key: menuKey, noteId: note.id, right: window.innerWidth - rect.right, top: rect.top };
+                state.note_menu = { key: menuKey, noteId: note.id, right: window.innerWidth - rect.right, top: rect.top, pairIdx };
               } : undefined,
               style: live ? '' : 'cursor: default',
             }, m('.note-content', note.content)),
@@ -443,6 +485,7 @@
               m('.pair-response', renderResponse(pair.response, i)),
             ])
           )),
+          state.toast ? m('.toast', state.toast) : null,
           menuNote ? m('.note-popup', {
             style: `right: ${menu.right}px; top: ${menu.top}px;`,
             onclick: e => e.stopPropagation(),
@@ -450,6 +493,7 @@
             m('button', {
               onclick: () => {
                 state.input = `/edit ${menuNote.id.slice(0, 7)} ${menuNote.content}`;
+                state.collapsing = { pairIdx: menu.pairIdx };
                 state.note_menu = null;
                 const inp = document.querySelector('#input-row input');
                 if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
