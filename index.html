@@ -220,7 +220,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes' } });
+        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -237,6 +237,22 @@
         } else {
           state.pairs.unshift({ command: input, response: { type: 'notes', notes } });
         }
+      },
+      '/edit': (input) => {
+        const parts = input.replace(/^\/edit\s*/i, '').match(/^(\S+)\s+([\s\S]+)$/);
+        if (!parts) {
+          state.pairs.unshift({ command: input, response: { type: 'text', content: 'Usage: /edit <id> <new text>' } });
+          return;
+        }
+        const [, shortId, newContent] = parts;
+        const note = state.notes.find(n => n.id.startsWith(shortId));
+        if (!note) {
+          state.pairs.unshift({ command: input, response: { type: 'text', content: `No note found with id: ${shortId}` } });
+          return;
+        }
+        note.content = newContent.trim();
+        state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
+        if (db) dbPut(note);
       },
     };
 
