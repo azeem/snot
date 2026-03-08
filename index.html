@@ -2,45 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>snot</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <script src="https://cdn.jsdelivr.net/npm/mithril@2/mithril.min.js"></script>
   <style>
-    html, body {
-      height: 100%;
-      overflow: hidden;
-    }
-
     body {
       max-width: 720px;
       margin: 0 auto;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-    }
-
-    #app {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
-    }
-
-    main {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-      min-height: 0;
+      padding: 1rem;
+      padding-top: 5rem;
     }
 
     #messages {
       display: flex;
       flex-direction: column;
       gap: 0.5rem;
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem;
     }
 
     .message {
@@ -66,9 +43,15 @@
     #input-row {
       display: flex;
       gap: 0.5rem;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      max-width: 720px;
+      margin: 0 auto;
       padding: 0.75rem 1rem;
-      border-top: 1px solid var(--pico-muted-border-color);
-      flex-shrink: 0;
+      background: var(--pico-background-color);
+      border-bottom: 1px solid var(--pico-muted-border-color);
     }
 
     #input-row input {
@@ -130,9 +113,6 @@
     const App = {
       view() {
         return m('main', [
-          m('#messages', state.messages.map((msg, i) =>
-            m('.message', { key: i, class: msg.type }, msg.text)
-          )),
           m('#input-row', [
             m('input', {
               type: 'text',
@@ -144,6 +124,9 @@
             }),
             m('button', { onclick: handleSubmit }, 'Send'),
           ]),
+          m('#messages', state.messages.map((msg, i) =>
+            m('.message', { key: i, class: msg.type }, msg.text)
+          )),
         ]);
       }
     };
