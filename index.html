@@ -327,7 +327,7 @@
             ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
             : null,
           m('#pairs', state.pairs.map((pair, i) =>
-            m('.pair', { key: i }, [
+            m('.pair', { key: i, style: i > 0 ? 'opacity: 0.35' : '' }, [
               m('.pair-command', {
                 class: pair.expanded ? 'expanded' : '',
                 onclick: () => { pair.expanded = !pair.expanded; },
