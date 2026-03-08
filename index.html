@@ -68,16 +68,12 @@
       padding: 0.75rem 1rem;
       background: var(--pico-background-color);
       border-bottom: 1px solid var(--pico-muted-border-color);
+      z-index: 1000;
     }
 
     #input-row input {
       flex: 1;
       margin: 0;
-    }
-
-    #input-row button {
-      margin: 0;
-      width: auto;
     }
 
     #input-wrapper {
@@ -327,7 +323,6 @@
                   ))
                 : null,
             ]),
-            m('button', { onclick: handleSubmit }, 'Send'),
           ]),
           state.show_welcome
             ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
@@ -350,10 +345,12 @@
     function updateFadeOpacity() {
       const firstPair = document.querySelector('#pairs .pair');
       const pairsEl = document.getElementById('pairs');
+      const inputRow = document.getElementById('input-row');
       if (!firstPair || !pairsEl) return;
       const rect = firstPair.getBoundingClientRect();
-      // visibleRatio: 1 when fully in viewport, 0 when fully scrolled past
-      const visibleRatio = Math.max(0, Math.min(1, rect.bottom / rect.height));
+      const inputRowHeight = inputRow ? inputRow.getBoundingClientRect().height : 0;
+      // visibleRatio: 1 when fully below the input row, 0 when fully scrolled behind it
+      const visibleRatio = Math.max(0, Math.min(1, (rect.bottom - inputRowHeight) / rect.height));
       const opacity = 0.35 + (1 - visibleRatio) * 0.65;
       pairsEl.style.setProperty('--older-pair-opacity', opacity);
     }
