@@ -76,11 +76,6 @@
       margin: 0;
     }
 
-    #input-row button {
-      margin: 0;
-      width: auto;
-    }
-
     #input-wrapper {
       flex: 1;
       position: relative;
@@ -328,7 +323,6 @@
                   ))
                 : null,
             ]),
-            m('button', { onclick: handleSubmit }, 'Send'),
           ]),
           state.show_welcome
             ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
