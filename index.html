@@ -34,17 +34,19 @@
       background: var(--pico-card-sectioning-background-color);
       border-top: 1px solid var(--pico-muted-border-color);
       border-bottom: 1px solid var(--pico-muted-border-color);
-      white-space: nowrap;
+      white-space: pre-line;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
       cursor: pointer;
       user-select: none;
     }
 
     .pair-command.expanded {
-      white-space: pre-line;
+      display: block;
+      -webkit-line-clamp: unset;
       overflow: visible;
-      text-overflow: unset;
       word-break: break-word;
     }
 
@@ -511,7 +513,7 @@
               m('.pair-command', {
                 class: pair.expanded ? 'expanded' : '',
                 onclick: () => { pair.expanded = !pair.expanded; },
-              }, pair.expanded ? pair.command : pair.command.split('\n')[0]),
+              }, pair.command),
               m('.pair-response', renderResponse(pair.response, i)),
             ])
           )),
