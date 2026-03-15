@@ -250,6 +250,38 @@
       toast: null,
     };
 
+    function scrollAfterKeyboardDismiss(targetEl, headerHeight) {
+      function doScroll() {
+        // Nudge to unstick iOS Safari's offsetTop after keyboard dismissal
+        window.scrollBy(0, 1);
+        window.scrollBy(0, -1);
+        requestAnimationFrame(() => {
+          const rect = targetEl.getBoundingClientRect();
+          const offset = rect.top - headerHeight - 8;
+          if (Math.abs(offset) > 2) window.scrollBy({ top: offset, behavior: 'smooth' });
+        });
+      }
+
+      const vv = window.visualViewport;
+      if (!vv) { setTimeout(doScroll, 350); return; }
+
+      const THRESHOLD = 150;
+      if ((window.innerHeight - vv.height) <= THRESHOLD) { doScroll(); return; }
+
+      let lastHeight = vv.height, stableCount = 0, frameCount = 0;
+      function poll() {
+        frameCount++;
+        const h = vv.height;
+        if (h !== lastHeight) { lastHeight = h; stableCount = 0; } else { stableCount++; }
+        if (((window.innerHeight - h) <= THRESHOLD && stableCount >= 3) || frameCount >= 120) {
+          doScroll();
+        } else {
+          requestAnimationFrame(poll);
+        }
+      }
+      requestAnimationFrame(poll);
+    }
+
     let _toastTimer = null;
     function showToast(msg) {
       state.toast = msg;
@@ -336,15 +368,13 @@
             state.pairs.splice(collapseCtx.pairIdx, 1);
             state.pairs.unshift(pair);
           }
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             const firstPair = document.querySelector('#pairs .pair');
             const inputRow = document.getElementById('input-row');
             if (firstPair && inputRow) {
-              const inputRowHeight = inputRow.getBoundingClientRect().height;
-              const pairTop = firstPair.getBoundingClientRect().top + window.scrollY;
-              window.scrollTo({ top: pairTop - inputRowHeight - 8, behavior: 'smooth' });
+              scrollAfterKeyboardDismiss(firstPair, inputRow.getBoundingClientRect().height);
             }
-          }, 1000);
+          });
         } else {
           state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
         }
