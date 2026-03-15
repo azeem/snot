@@ -511,7 +511,7 @@
               m('.pair-command', {
                 class: pair.expanded ? 'expanded' : '',
                 onclick: () => { pair.expanded = !pair.expanded; },
-              }, pair.command),
+              }, pair.expanded ? pair.command : pair.command.split('\n')[0]),
               m('.pair-response', renderResponse(pair.response, i)),
             ])
           )),
