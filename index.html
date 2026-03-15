@@ -296,7 +296,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /edit /id:<id> <text> — edit a note by id' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -322,13 +322,19 @@
         }
       },
       '/edit': (input, collapseCtx) => {
-        const parts = input.replace(/^\/edit\s*/i, '').match(/^(\S+)\s+([\s\S]+)$/);
-        if (!parts) {
-          if (collapseCtx) { showToast('Usage: /edit <id> <new text>'); return; }
-          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /edit <id> <new text>' } });
+        const idMatch = input.match(/\/id:(\S+)/);
+        if (!idMatch) {
+          if (collapseCtx) { showToast('Usage: /edit /id:<id> <new text>'); return; }
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /edit /id:<id> <new text>' } });
           return;
         }
-        const [, shortId, newContent] = parts;
+        const shortId = idMatch[1];
+        const newContent = input.replace(/^\/edit\s*/i, '').replace(/\/id:\S+\s*/, '').trim();
+        if (!newContent) {
+          if (collapseCtx) { showToast('Usage: /edit /id:<id> <new text>'); return; }
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /edit /id:<id> <new text>' } });
+          return;
+        }
         const note = state.notes.find(n => n.id.startsWith(shortId));
         if (!note) {
           if (collapseCtx) { showToast(`No note found with id: ${shortId}`); return; }
@@ -352,6 +358,7 @@
 
     const commandArgs = {
       '/list': ['/limit', '/offset'],
+      '/edit': ['/id'],
     };
 
     function isArgMode() {
@@ -559,7 +566,7 @@
           }, [
             m('button', {
               onclick: () => {
-                state.input = `/edit ${menuNote.id.slice(0, 7)} ${menuNote.content}`;
+                state.input = `/edit /id:${menuNote.id.slice(0, 7)} ${menuNote.content}`;
                 state.collapsing = { pairIdx: menu.pairIdx };
                 state.note_menu = null;
                 const inp = document.querySelector('#input-row input');
