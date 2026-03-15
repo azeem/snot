@@ -350,7 +350,25 @@
       },
     };
 
+    const commandArgs = {
+      '/list': ['/limit', '/offset'],
+    };
+
+    function isArgMode() {
+      const val = state.input;
+      if (!val.includes(' ')) return false;
+      const lastToken = val.split(' ').pop();
+      return lastToken.startsWith('/') && !lastToken.includes(':');
+    }
+
     function filteredCommands() {
+      if (isArgMode()) {
+        const parts = state.input.split(' ');
+        const cmdKey = parts[0].toLowerCase();
+        const lastToken = parts[parts.length - 1];
+        const usedArgs = parts.slice(1, -1).filter(p => p.startsWith('/') && p.includes(':')).map(p => p.split(':')[0]);
+        return (commandArgs[cmdKey] || []).filter(a => a.startsWith(lastToken) && !usedArgs.includes(a));
+      }
       const query = state.input.split(' ')[0].toLowerCase();
       return Object.keys(commands).filter(c => c.startsWith(query));
     }
@@ -360,8 +378,14 @@
       state.autocomplete_index = 0;
     }
 
-    function selectCommand(cmd) {
-      state.input = cmd + ' ';
+    function selectCommand(item) {
+      if (isArgMode()) {
+        const parts = state.input.split(' ');
+        parts[parts.length - 1] = item + ':';
+        state.input = parts.join(' ');
+      } else {
+        state.input = item + ' ';
+      }
       dismissAutocomplete();
     }
 
@@ -380,8 +404,11 @@
       if (state.collapsing && !val.includes(' ')) {
         state.collapsing = null;
       }
-      // Show/update autocomplete while typing a command
-      if (state.autocomplete || (val.startsWith('/') && val.indexOf(' ') === -1)) {
+      // Show/update autocomplete while typing a command or argument
+      const parts = val.split(' ');
+      const lastToken = parts[parts.length - 1];
+      const inArgMode = val.startsWith('/') && parts.length > 1 && lastToken.startsWith('/') && !lastToken.includes(':');
+      if (state.autocomplete || (val.startsWith('/') && val.indexOf(' ') === -1) || inArgMode) {
         state.autocomplete = true;
         state.autocomplete_index = 0;
       } else {
