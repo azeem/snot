@@ -336,6 +336,15 @@
             state.pairs.splice(collapseCtx.pairIdx, 1);
             state.pairs.unshift(pair);
           }
+          requestAnimationFrame(() => {
+            const firstPair = document.querySelector('#pairs .pair');
+            const inputRow = document.getElementById('input-row');
+            if (firstPair && inputRow) {
+              const inputRowHeight = inputRow.getBoundingClientRect().height;
+              const pairTop = firstPair.getBoundingClientRect().top + window.scrollY;
+              window.scrollTo({ top: pairTop - inputRowHeight - 8, behavior: 'smooth' });
+            }
+          });
         } else {
           state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
         }
