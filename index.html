@@ -412,7 +412,7 @@
           return;
         }
       }
-      if (e.key === 'Enter') handleSubmit();
+      if (e.key === 'Enter') { e.target.blur(); handleSubmit(); }
     }
 
     function handleSubmit() {
