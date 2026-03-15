@@ -42,10 +42,24 @@
     }
 
     .pair-command.expanded {
-      white-space: normal;
+      white-space: pre-line;
       overflow: visible;
       text-overflow: unset;
       word-break: break-word;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--pico-contrast-background, #333);
+      color: var(--pico-contrast-inverse, #fff);
+      padding: 0.45rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.85rem;
+      z-index: 2000;
+      pointer-events: none;
     }
 
     .pair-response {
@@ -76,6 +90,23 @@
       margin: 0;
     }
 
+    #clear-btn {
+      background: none;
+      border: none;
+      color: var(--pico-muted-color);
+      font-size: 1.25rem;
+      line-height: 1;
+      padding: 0 0.25rem;
+      cursor: pointer;
+      flex-shrink: 0;
+      width: auto;
+      margin: 0;
+    }
+
+    #clear-btn:hover {
+      color: var(--pico-color);
+    }
+
     #input-wrapper {
       flex: 1;
       position: relative;
@@ -98,9 +129,9 @@
     }
 
     .autocomplete-item {
-      padding: 0.4rem 0.75rem;
+      padding: 0.65rem 0.75rem;
       cursor: pointer;
-      font-size: 0.9rem;
+      font-size: 1rem;
     }
 
     .autocomplete-item:hover,
@@ -117,7 +148,7 @@
     }
 
     .note-meta {
-      font-size: 0.7rem;
+      font-size: 0.8rem;
       color: var(--pico-muted-color);
       margin-bottom: 0.15rem;
       padding-left: 0.15rem;
@@ -127,12 +158,43 @@
       background: var(--pico-card-sectioning-background-color);
       border-radius: 0.375rem;
       padding: 0.35rem 0.6rem;
+      cursor: pointer;
+      user-select: none;
     }
 
     .note-content {
       white-space: pre-wrap;
       word-break: break-word;
       font-size: 0.9rem;
+      pointer-events: none;
+    }
+
+    .note-popup {
+      position: fixed;
+      background: var(--pico-card-background-color, #fff);
+      border: 1px solid var(--pico-muted-border-color, #ccc);
+      border-radius: 0.5rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      padding: 0.25rem;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      min-width: 130px;
+    }
+
+    .note-popup button {
+      margin: 0;
+      text-align: left;
+      background: none;
+      border: none;
+      border-radius: 0.35rem;
+      padding: 0.4rem 0.75rem;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .note-popup button:hover {
+      background: var(--pico-muted-background-color, #f4f4f4);
     }
   </style>
 </head>
@@ -140,6 +202,39 @@
   <div id="app"></div>
 
   <script>
+    // IndexedDB setup
+    const DB_NAME = 'snot';
+    const DB_VERSION = 2;
+    const STORE_NAME = 'notes';
+    let db = null;
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = e => {
+          const d = e.target.result;
+          if (d.objectStoreNames.contains(STORE_NAME)) d.deleteObjectStore(STORE_NAME);
+          d.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = e => reject(e.target.error);
+      });
+    }
+
+    function dbPut(note) {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).put(note);
+    }
+
+    function dbGetAll() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).getAll();
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = e => reject(e.target.error);
+      });
+    }
+
     const state = {
       pairs: [],
       notes: [],
@@ -147,7 +242,18 @@
       input: '',
       autocomplete: false,
       autocomplete_index: 0,
+      note_menu: null,
+      collapsing: null,
+      toast: null,
     };
+
+    let _toastTimer = null;
+    function showToast(msg) {
+      state.toast = msg;
+      clearTimeout(_toastTimer);
+      _toastTimer = setTimeout(() => { state.toast = null; m.redraw(); }, 3000);
+      m.redraw();
+    }
 
     function formatNoteDate(ts) {
       const d = new Date(ts);
@@ -162,8 +268,15 @@
       return `${d.getFullYear()}/${M}/${D} ${hhmm}`;
     }
 
+    function generateUUID() {
+      if (crypto.randomUUID) return crypto.randomUUID();
+      return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, c =>
+        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+      );
+    }
+
     function createNote(content) {
-      return { content, created_at: Date.now() };
+      return { id: generateUUID(), content, created_at: Date.now() };
     }
 
     function handleNote(input, displayCommand) {
@@ -175,11 +288,12 @@
       const note = createNote(content);
       state.notes.push(note);
       state.pairs.unshift({ command: displayCommand, response: { type: 'notes', notes: [note] } });
+      if (db) dbPut(note);
     }
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes' } });
+        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -196,6 +310,33 @@
         } else {
           state.pairs.unshift({ command: input, response: { type: 'notes', notes } });
         }
+      },
+      '/edit': (input, collapseCtx) => {
+        const parts = input.replace(/^\/edit\s*/i, '').match(/^(\S+)\s+([\s\S]+)$/);
+        if (!parts) {
+          if (collapseCtx) { showToast('Usage: /edit <id> <new text>'); return; }
+          state.pairs.unshift({ command: input, response: { type: 'text', content: 'Usage: /edit <id> <new text>' } });
+          return;
+        }
+        const [, shortId, newContent] = parts;
+        const note = state.notes.find(n => n.id.startsWith(shortId));
+        if (!note) {
+          if (collapseCtx) { showToast(`No note found with id: ${shortId}`); return; }
+          state.pairs.unshift({ command: input, response: { type: 'text', content: `No note found with id: ${shortId}` } });
+          return;
+        }
+        note.content = newContent.trim();
+        if (collapseCtx) {
+          const pair = state.pairs[collapseCtx.pairIdx];
+          if (pair) {
+            pair.command = input + '\n' + pair.command;
+            state.pairs.splice(collapseCtx.pairIdx, 1);
+            state.pairs.unshift(pair);
+          }
+        } else {
+          state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
+        }
+        if (db) dbPut(note);
       },
     };
 
@@ -225,6 +366,10 @@
         return;
       }
       state.input = val;
+      // Clear collapsing tag if user deletes back to bare command word (no space = no args)
+      if (state.collapsing && !val.includes(' ')) {
+        state.collapsing = null;
+      }
       // Show/update autocomplete while typing a command
       if (state.autocomplete || (val.startsWith('/') && val.indexOf(' ') === -1)) {
         state.autocomplete = true;
@@ -271,38 +416,63 @@
       const input = state.input.trim();
       if (!input) return;
 
+      const collapseCtx = state.collapsing;
       dismissAutocomplete();
       state.show_welcome = false;
       state.input = '';
+      state.collapsing = null;
 
       if (input.startsWith('/')) {
-        const cmd = commands[input.split(' ')[0].toLowerCase()];
+        const cmdKey = input.split(' ')[0].toLowerCase();
+        const cmd = commands[cmdKey];
         if (cmd) {
-          cmd(input);
+          cmd(input, collapseCtx);
         } else {
-          state.pairs.unshift({ command: input, response: { type: 'text', content: `Unknown command: ${input.split(' ')[0].toLowerCase()}` } });
+          if (collapseCtx) {
+            showToast(`Unknown command: ${cmdKey}`);
+          } else {
+            state.pairs.unshift({ command: input, response: { type: 'text', content: `Unknown command: ${cmdKey}` } });
+          }
         }
       } else {
         handleNote(input, '/note ' + input);
       }
     }
 
-    function renderResponse(response) {
+    function renderResponse(response, pairIdx) {
       if (!response || typeof response === 'string') return response;
       if (response.type === 'text') return response.content;
       if (response.type === 'notes') {
-        return response.notes.map(note =>
-          m('.note-item', [
+        return response.notes.map(note => {
+          const live = state.notes.find(n => n.id === note.id);
+          const menuKey = `${pairIdx}_${note.id}`;
+          const menuOpen = state.note_menu && state.note_menu.key === menuKey;
+          return m('.note-item', [
             m('.note-meta', formatNoteDate(note.created_at)),
-            m('.note-box', m('.note-content', note.content)),
-          ])
-        );
+            m('.note-box', {
+              onclick: live ? (e) => {
+                e.stopPropagation();
+                if (menuOpen) { state.note_menu = null; return; }
+                const rect = e.currentTarget.getBoundingClientRect();
+                state.note_menu = { key: menuKey, noteId: note.id, right: window.innerWidth - rect.right, top: rect.top, pairIdx };
+              } : undefined,
+              style: live ? '' : 'cursor: default',
+            }, m('.note-content', note.content)),
+          ]);
+        });
       }
     }
 
     const App = {
+      oncreate() {
+        document.addEventListener('click', () => {
+          if (state.note_menu) { state.note_menu = null; m.redraw(); }
+        });
+      },
       view() {
         const items = state.autocomplete ? filteredCommands() : [];
+        const menu = state.note_menu;
+        const menuNote = menu && state.notes.find(n => n.id === menu.noteId);
         return m('main', [
           m('#input-row', [
             m('#input-wrapper', [
@@ -323,6 +493,15 @@
                   ))
                 : null,
             ]),
+            state.input ? m('button#clear-btn', {
+              onmousedown: e => e.preventDefault(),
+              onclick: () => {
+                state.input = '';
+                state.collapsing = null;
+                dismissAutocomplete();
+                document.querySelector('#input-row input').focus();
+              },
+            }, '×') : null,
           ]),
           state.show_welcome
             ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
@@ -333,14 +512,37 @@
                 class: pair.expanded ? 'expanded' : '',
                 onclick: () => { pair.expanded = !pair.expanded; },
               }, pair.command),
-              m('.pair-response', renderResponse(pair.response)),
+              m('.pair-response', renderResponse(pair.response, i)),
             ])
           )),
+          state.toast ? m('.toast', state.toast) : null,
+          menuNote ? m('.note-popup', {
+            style: `right: ${menu.right}px; top: ${menu.top}px;`,
+            onclick: e => e.stopPropagation(),
+          }, [
+            m('button', {
+              onclick: () => {
+                state.input = `/edit ${menuNote.id.slice(0, 7)} ${menuNote.content}`;
+                state.collapsing = { pairIdx: menu.pairIdx };
+                state.note_menu = null;
+                const inp = document.querySelector('#input-row input');
+                if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+              },
+            }, 'Edit'),
+          ]) : null,
         ]);
       }
     };
 
     m.mount(document.getElementById('app'), App);
+
+    openDB().then(database => {
+      db = database;
+      return dbGetAll();
+    }).then(notes => {
+      state.notes = notes.sort((a, b) => a.created_at - b.created_at);
+      m.redraw();
+    }).catch(err => console.error('IndexedDB error:', err));
 
     function updateFadeOpacity() {
       const firstPair = document.querySelector('#pairs .pair');
@@ -354,6 +556,10 @@
       const opacity = 0.35 + (1 - visibleRatio) * 0.65;
       pairsEl.style.setProperty('--older-pair-opacity', opacity);
     }
+
+    document.addEventListener('click', () => {
+      if (state.note_menu) { state.note_menu = null; m.redraw(); }
+    });
 
     window.addEventListener('scroll', updateFadeOpacity, { passive: true });
     // Re-run after Mithril redraws so the first pair element exists
