@@ -336,7 +336,7 @@
             state.pairs.splice(collapseCtx.pairIdx, 1);
             state.pairs.unshift(pair);
           }
-          requestAnimationFrame(() => {
+          setTimeout(() => {
             const firstPair = document.querySelector('#pairs .pair');
             const inputRow = document.getElementById('input-row');
             if (firstPair && inputRow) {
@@ -344,7 +344,7 @@
               const pairTop = firstPair.getBoundingClientRect().top + window.scrollY;
               window.scrollTo({ top: pairTop - inputRowHeight - 8, behavior: 'smooth' });
             }
-          });
+          }, 150);
         } else {
           state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
         }
