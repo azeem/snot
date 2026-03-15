@@ -336,7 +336,7 @@
             state.pairs.splice(collapseCtx.pairIdx, 1);
             state.pairs.unshift(pair);
             const targetId = 'p-' + pair.pairId;
-            requestAnimationFrame(() => { window.location.hash = targetId; });
+            setTimeout(() => { window.location.hash = targetId; }, 500);
           }
         } else {
           state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes: [note] } });
