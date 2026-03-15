@@ -296,7 +296,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -307,9 +307,16 @@
         handleNote(content, input);
       },
       '/list': (input) => {
-        const notes = state.notes.slice(-10).reverse();
-        if (!notes.length) {
+        const args = {};
+        input.replace(/\/(\w+):(\S+)/g, (_, k, v) => { args[k] = v; });
+        const limit = Math.max(1, parseInt(args.limit) || 10);
+        const offset = Math.max(0, parseInt(args.offset) || 0);
+        const all = state.notes.slice().reverse();
+        const notes = all.slice(offset, offset + limit);
+        if (!all.length) {
           state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'No notes yet.' } });
+        } else if (!notes.length) {
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `No notes at offset ${offset}.` } });
         } else {
           state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes } });
         }
