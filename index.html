@@ -31,20 +31,22 @@
       margin-right: -1rem;
       font-size: 0.8rem;
       color: var(--pico-muted-color);
-      background: var(--pico-card-sectioning-background-color);
+      background: color-mix(in srgb, var(--pico-primary-background) 30%, var(--pico-background-color, white));
       border-top: 1px solid var(--pico-muted-border-color);
       border-bottom: 1px solid var(--pico-muted-border-color);
-      white-space: nowrap;
+      white-space: pre-line;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
       overflow: hidden;
-      text-overflow: ellipsis;
       cursor: pointer;
       user-select: none;
     }
 
     .pair-command.expanded {
-      white-space: pre-line;
+      display: block;
+      -webkit-line-clamp: unset;
       overflow: visible;
-      text-overflow: unset;
       word-break: break-word;
     }
 
@@ -191,6 +193,7 @@
       padding: 0.4rem 0.75rem;
       width: 100%;
       cursor: pointer;
+      color: inherit;
     }
 
     .note-popup button:hover {
@@ -282,18 +285,18 @@
     function handleNote(input, displayCommand) {
       const content = input.trim();
       if (!content) {
-        state.pairs.unshift({ command: displayCommand, response: { type: 'text', content: 'Usage: /note <text>' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: displayCommand, response: { type: 'text', content: 'Usage: /note <text>' } });
         return;
       }
       const note = createNote(content);
       state.notes.push(note);
-      state.pairs.unshift({ command: displayCommand, response: { type: 'notes', notes: [note] } });
+      state.pairs.unshift({ pairId: generateUUID(), command: displayCommand, response: { type: 'notes', notes: [note] } });
       if (db) dbPut(note);
     }
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -306,23 +309,23 @@
       '/list': (input) => {
         const notes = state.notes.slice(-10).reverse();
         if (!notes.length) {
-          state.pairs.unshift({ command: input, response: { type: 'text', content: 'No notes yet.' } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'No notes yet.' } });
         } else {
-          state.pairs.unshift({ command: input, response: { type: 'notes', notes } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes } });
         }
       },
       '/edit': (input, collapseCtx) => {
         const parts = input.replace(/^\/edit\s*/i, '').match(/^(\S+)\s+([\s\S]+)$/);
         if (!parts) {
           if (collapseCtx) { showToast('Usage: /edit <id> <new text>'); return; }
-          state.pairs.unshift({ command: input, response: { type: 'text', content: 'Usage: /edit <id> <new text>' } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /edit <id> <new text>' } });
           return;
         }
         const [, shortId, newContent] = parts;
         const note = state.notes.find(n => n.id.startsWith(shortId));
         if (!note) {
           if (collapseCtx) { showToast(`No note found with id: ${shortId}`); return; }
-          state.pairs.unshift({ command: input, response: { type: 'text', content: `No note found with id: ${shortId}` } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `No note found with id: ${shortId}` } });
           return;
         }
         note.content = newContent.trim();
@@ -334,7 +337,7 @@
             state.pairs.unshift(pair);
           }
         } else {
-          state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes: [note] } });
         }
         if (db) dbPut(note);
       },
@@ -409,7 +412,7 @@
           return;
         }
       }
-      if (e.key === 'Enter') handleSubmit();
+      if (e.key === 'Enter') { e.target.blur(); handleSubmit(); }
     }
 
     function handleSubmit() {
@@ -431,7 +434,7 @@
           if (collapseCtx) {
             showToast(`Unknown command: ${cmdKey}`);
           } else {
-            state.pairs.unshift({ command: input, response: { type: 'text', content: `Unknown command: ${cmdKey}` } });
+            state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `Unknown command: ${cmdKey}` } });
           }
         }
       } else {
@@ -507,7 +510,7 @@
             ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
             : null,
           m('#pairs', state.pairs.map((pair, i) =>
-            m('.pair', { key: i }, [
+            m('.pair', { key: i, id: 'p-' + pair.pairId }, [
               m('.pair-command', {
                 class: pair.expanded ? 'expanded' : '',
                 onclick: () => { pair.expanded = !pair.expanded; },
