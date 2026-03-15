@@ -250,38 +250,6 @@
       toast: null,
     };
 
-    function scrollAfterKeyboardDismiss(targetEl, headerHeight) {
-      function doScroll() {
-        // Nudge to unstick iOS Safari's offsetTop after keyboard dismissal
-        window.scrollBy(0, 1);
-        window.scrollBy(0, -1);
-        requestAnimationFrame(() => {
-          const rect = targetEl.getBoundingClientRect();
-          const offset = rect.top - headerHeight - 8;
-          if (Math.abs(offset) > 2) window.scrollBy({ top: offset, behavior: 'smooth' });
-        });
-      }
-
-      const vv = window.visualViewport;
-      if (!vv) { setTimeout(doScroll, 350); return; }
-
-      const THRESHOLD = 150;
-      if ((window.innerHeight - vv.height) <= THRESHOLD) { doScroll(); return; }
-
-      let lastHeight = vv.height, stableCount = 0, frameCount = 0;
-      function poll() {
-        frameCount++;
-        const h = vv.height;
-        if (h !== lastHeight) { lastHeight = h; stableCount = 0; } else { stableCount++; }
-        if (((window.innerHeight - h) <= THRESHOLD && stableCount >= 3) || frameCount >= 120) {
-          doScroll();
-        } else {
-          requestAnimationFrame(poll);
-        }
-      }
-      requestAnimationFrame(poll);
-    }
-
     let _toastTimer = null;
     function showToast(msg) {
       state.toast = msg;
@@ -317,18 +285,18 @@
     function handleNote(input, displayCommand) {
       const content = input.trim();
       if (!content) {
-        state.pairs.unshift({ command: displayCommand, response: { type: 'text', content: 'Usage: /note <text>' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: displayCommand, response: { type: 'text', content: 'Usage: /note <text>' } });
         return;
       }
       const note = createNote(content);
       state.notes.push(note);
-      state.pairs.unshift({ command: displayCommand, response: { type: 'notes', notes: [note] } });
+      state.pairs.unshift({ pairId: generateUUID(), command: displayCommand, response: { type: 'notes', notes: [note] } });
       if (db) dbPut(note);
     }
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -341,23 +309,23 @@
       '/list': (input) => {
         const notes = state.notes.slice(-10).reverse();
         if (!notes.length) {
-          state.pairs.unshift({ command: input, response: { type: 'text', content: 'No notes yet.' } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'No notes yet.' } });
         } else {
-          state.pairs.unshift({ command: input, response: { type: 'notes', notes } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes } });
         }
       },
       '/edit': (input, collapseCtx) => {
         const parts = input.replace(/^\/edit\s*/i, '').match(/^(\S+)\s+([\s\S]+)$/);
         if (!parts) {
           if (collapseCtx) { showToast('Usage: /edit <id> <new text>'); return; }
-          state.pairs.unshift({ command: input, response: { type: 'text', content: 'Usage: /edit <id> <new text>' } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /edit <id> <new text>' } });
           return;
         }
         const [, shortId, newContent] = parts;
         const note = state.notes.find(n => n.id.startsWith(shortId));
         if (!note) {
           if (collapseCtx) { showToast(`No note found with id: ${shortId}`); return; }
-          state.pairs.unshift({ command: input, response: { type: 'text', content: `No note found with id: ${shortId}` } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `No note found with id: ${shortId}` } });
           return;
         }
         note.content = newContent.trim();
@@ -367,16 +335,11 @@
             pair.command = input + '\n' + pair.command;
             state.pairs.splice(collapseCtx.pairIdx, 1);
             state.pairs.unshift(pair);
+            const targetId = 'p-' + pair.pairId;
+            requestAnimationFrame(() => { window.location.hash = targetId; });
           }
-          requestAnimationFrame(() => {
-            const firstPair = document.querySelector('#pairs .pair');
-            const inputRow = document.getElementById('input-row');
-            if (firstPair && inputRow) {
-              scrollAfterKeyboardDismiss(firstPair, inputRow.getBoundingClientRect().height);
-            }
-          });
         } else {
-          state.pairs.unshift({ command: input, response: { type: 'notes', notes: [note] } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes: [note] } });
         }
         if (db) dbPut(note);
       },
@@ -473,7 +436,7 @@
           if (collapseCtx) {
             showToast(`Unknown command: ${cmdKey}`);
           } else {
-            state.pairs.unshift({ command: input, response: { type: 'text', content: `Unknown command: ${cmdKey}` } });
+            state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `Unknown command: ${cmdKey}` } });
           }
         }
       } else {
@@ -549,7 +512,7 @@
             ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
             : null,
           m('#pairs', state.pairs.map((pair, i) =>
-            m('.pair', { key: i }, [
+            m('.pair', { key: i, id: 'p-' + pair.pairId }, [
               m('.pair-command', {
                 class: pair.expanded ? 'expanded' : '',
                 onclick: () => { pair.expanded = !pair.expanded; },
