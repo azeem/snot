@@ -335,8 +335,6 @@
             pair.command = input + '\n' + pair.command;
             state.pairs.splice(collapseCtx.pairIdx, 1);
             state.pairs.unshift(pair);
-            const targetId = 'p-' + pair.pairId;
-            setTimeout(() => { window.location.hash = targetId; }, 500);
           }
         } else {
           state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes: [note] } });
