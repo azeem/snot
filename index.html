@@ -184,6 +184,12 @@
       min-width: 130px;
     }
 
+    .note-popup-info {
+      font-size: 0.75rem;
+      color: var(--pico-muted-color);
+      padding: 0.3rem 0.5rem 0.2rem;
+    }
+
     .note-popup button {
       margin: 0;
       text-align: left;
@@ -492,13 +498,12 @@
           const menuKey = `${pairIdx}_${note.id}`;
           const menuOpen = state.note_menu && state.note_menu.key === menuKey;
           return m('.note-item', [
-            m('.note-meta', formatNoteDate(note.created_at)),
             m('.note-box', {
               onclick: live ? (e) => {
                 e.stopPropagation();
                 if (menuOpen) { state.note_menu = null; return; }
                 const rect = e.currentTarget.getBoundingClientRect();
-                state.note_menu = { key: menuKey, noteId: note.id, right: window.innerWidth - rect.right, top: rect.top, pairIdx };
+                state.note_menu = { key: menuKey, noteId: note.id, createdAt: note.created_at, right: window.innerWidth - rect.right, top: rect.top, pairIdx };
               } : undefined,
               style: live ? '' : 'cursor: default',
             }, m('.note-content', note.content)),
@@ -564,6 +569,7 @@
             style: `right: ${menu.right}px; top: ${menu.top}px;`,
             onclick: e => e.stopPropagation(),
           }, [
+            m('.note-popup-info', formatNoteDate(menu.createdAt)),
             m('button', {
               onclick: () => {
                 state.input = `/edit /id:${menuNote.id.slice(0, 7)} ${menuNote.content}`;
