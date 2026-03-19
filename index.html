@@ -276,7 +276,7 @@
       });
     }
 
-    const CONFIG_DEFAULTS = { 'list-limit': 10 };
+    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list' };
     const userConfig = {};
 
     const state = {
@@ -337,7 +337,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /delete /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /delete /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/startup:"<cmd>"] [/reset:<config-name>] — view or set configuration' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -388,7 +388,7 @@
       },
       '/config': (input) => {
         const args = {};
-        input.replace(/\/(\w[^:\s]*):(\S+)/g, (_, k, v) => { args[k] = v; });
+        input.replace(/\/(\w[^:\s]*):(?:"([^"]*)"|([^"\/\s]\S*))/g, (_, k, q, u) => { args[k] = q !== undefined ? q : u; });
         const keys = Object.keys(args).filter(k => k !== 'config');
         if (!keys.length) {
           const lines = Object.keys(CONFIG_DEFAULTS).map(k => {
@@ -414,6 +414,12 @@
           }
           if (!(k in CONFIG_DEFAULTS)) {
             results.push(`Unknown config key: ${k}`);
+            continue;
+          }
+          if (k === 'startup') {
+            userConfig[k] = args[k];
+            if (db) dbConfigPut(k, args[k]);
+            results.push(`${k} set to ${args[k]}`);
             continue;
           }
           const parsed = parseInt(args[k]);
@@ -470,7 +476,7 @@
       '/list': ['/limit', '/offset'],
       '/note': ['/id'],
       '/delete': ['/id'],
-      '/config': ['/list-limit', '/reset'],
+      '/config': ['/list-limit', '/startup', '/reset'],
     };
 
     function isArgMode() {
@@ -708,6 +714,13 @@
     }).then(([notes, configRows]) => {
       state.notes = notes.sort((a, b) => a.created_at - b.created_at);
       configRows.forEach(row => { userConfig[row.key] = row.value; });
+      const startupCmd = userConfig['startup'] !== undefined ? userConfig['startup'] : CONFIG_DEFAULTS['startup'];
+      if (startupCmd) {
+        state.show_welcome = false;
+        const cmdKey = startupCmd.split(' ')[0].toLowerCase();
+        const cmd = commands[cmdKey];
+        if (cmd) cmd(startupCmd, null);
+      }
       m.redraw();
     }).catch(err => console.error('IndexedDB error:', err));
 
