@@ -208,6 +208,19 @@
     .note-popup button:hover {
       background: var(--pico-muted-background-color, #f4f4f4);
     }
+
+    .note-state-pill {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.1rem 0.4rem;
+      border-radius: 0.25rem;
+      background: var(--pico-primary-background);
+      color: var(--pico-primary-inverse);
+      margin-right: 0.4rem;
+      vertical-align: middle;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -276,7 +289,7 @@
       });
     }
 
-    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list' };
+    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL' };
     const userConfig = {};
 
     const state = {
@@ -319,8 +332,36 @@
       );
     }
 
+    function getStateNames() {
+      const raw = userConfig['state-names'] !== undefined ? userConfig['state-names'] : CONFIG_DEFAULTS['state-names'];
+      return raw.split(',').map(s => s.trim().toUpperCase()).filter(s => s && s !== 'NULL');
+    }
+
+    function getDefaultStateIndex() {
+      const def = ((userConfig['default-state'] !== undefined ? userConfig['default-state'] : CONFIG_DEFAULTS['default-state']) + '').toUpperCase();
+      if (def === 'NULL') return null;
+      const names = getStateNames();
+      const idx = names.indexOf(def);
+      return idx === -1 ? null : idx;
+    }
+
+    function getStateName(stateIdx) {
+      if (stateIdx === null || stateIdx === undefined) return null;
+      const names = getStateNames();
+      return names[stateIdx] !== undefined ? names[stateIdx] : null;
+    }
+
+    function getNextStateArg(note) {
+      const names = getStateNames();
+      if (!names.length) return null;
+      const cur = note.state;
+      if (cur === null || cur === undefined) return '/' + names[0];
+      if (cur >= names.length - 1) return '/NULL';
+      return '/' + names[cur + 1];
+    }
+
     function createNote(content) {
-      return { id: generateUUID(), content, created_at: Date.now() };
+      return { id: generateUUID(), content, created_at: Date.now(), state: getDefaultStateIndex() };
     }
 
     function handleNote(input, displayCommand) {
@@ -337,7 +378,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /delete /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/startup:"<cmd>"] [/reset:<config-name>] — view or set configuration' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [/<state>] [/NULL] [<text>] — create a note, or edit an existing one by id; use a state name or /NULL to set/clear state\n  /delete /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/startup:"<cmd>"] [/state-names:<names>] [/default-state:<name>] [/reset:<config-name>] — view or set configuration' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -346,7 +387,22 @@
       '/note': (input, collapseCtx) => {
         const args = {};
         input.replace(/\/(\w[^:\s]*):(\S+)/g, (_, k, v) => { args[k] = v; });
-        const text = input.replace(/^\/note\s*/i, '').replace(/\/\w[^:\s]*:\S+\s*/g, '').trim();
+        // Parse state args: /STATENAME or /NULL (no colon, after command)
+        const stateNames = getStateNames();
+        let newState = undefined; // undefined = don't change
+        const inputAfterCmd = input.replace(/^\/note\s*/i, '');
+        inputAfterCmd.replace(/\/([A-Za-z][A-Za-z0-9]*)(?=\s|$)/g, (_, name) => {
+          const upper = name.toUpperCase();
+          if (upper === 'NULL') {
+            newState = null;
+          } else {
+            const idx = stateNames.indexOf(upper);
+            if (idx !== -1) newState = idx;
+          }
+        });
+        // Build state pattern to strip from text
+        const statePattern = new RegExp('\\/(?:NULL|' + (stateNames.length ? stateNames.join('|') : 'XNOMATCH') + ')(?=\\s|$)\\s*', 'gi');
+        const text = inputAfterCmd.replace(/\/\w[^:\s]*:\S+\s*/g, '').replace(statePattern, '').trim();
         if (args.id) {
           const note = state.notes.find(n => n.id.startsWith(args.id));
           if (!note) {
@@ -355,6 +411,7 @@
             return;
           }
           if (text) note.content = text;
+          if (newState !== undefined) note.state = newState;
           if (collapseCtx) {
             const pair = state.pairs[collapseCtx.pairIdx];
             if (pair) {
@@ -423,6 +480,29 @@
             results.push(`${k} set to ${args[k]}`);
             continue;
           }
+          if (k === 'state-names') {
+            const parts = args[k].split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+            if (parts.includes('NULL')) {
+              results.push(`Invalid value for state-names: NULL is not allowed as a state name`);
+              continue;
+            }
+            if (!parts.length) {
+              results.push(`Invalid value for state-names: must have at least one name`);
+              continue;
+            }
+            const val = parts.join(',');
+            userConfig[k] = val;
+            if (db) dbConfigPut(k, val);
+            results.push(`${k} set to ${val}`);
+            continue;
+          }
+          if (k === 'default-state') {
+            const val = args[k].toUpperCase();
+            userConfig[k] = val;
+            if (db) dbConfigPut(k, val);
+            results.push(`${k} set to ${val}`);
+            continue;
+          }
           const parsed = parseInt(args[k]);
           if (isNaN(parsed) || parsed < 1) {
             results.push(`Invalid value for ${k}: ${args[k]}`);
@@ -475,10 +555,16 @@
 
     const commandArgs = {
       '/list': ['/limit', '/offset'],
-      '/note': ['/id'],
       '/delete': ['/id'],
-      '/config': ['/list-limit', '/startup', '/reset'],
     };
+
+    function getNoteArgs() {
+      return ['/id', '/NULL', ...getStateNames().map(n => '/' + n)];
+    }
+
+    function getConfigArgs() {
+      return ['/list-limit', '/startup', '/reset', '/state-names', '/default-state'];
+    }
 
     function isArgMode() {
       const val = state.input;
@@ -493,7 +579,11 @@
         const cmdKey = parts[0].toLowerCase();
         const lastToken = parts[parts.length - 1];
         const usedArgs = parts.slice(1, -1).filter(p => p.startsWith('/') && p.includes(':')).map(p => p.split(':')[0]);
-        return (commandArgs[cmdKey] || []).filter(a => a.startsWith(lastToken) && !usedArgs.includes(a));
+        let argList;
+        if (cmdKey === '/note') argList = getNoteArgs();
+        else if (cmdKey === '/config') argList = getConfigArgs();
+        else argList = commandArgs[cmdKey] || [];
+        return argList.filter(a => a.startsWith(lastToken) && !usedArgs.includes(a));
       }
       const query = state.input.split(' ')[0].toLowerCase();
       return Object.keys(commands).filter(c => c.startsWith(query));
@@ -610,6 +700,7 @@
           const live = state.notes.find(n => n.id === note.id);
           const menuKey = `${pairIdx}_${note.id}`;
           const menuOpen = state.note_menu && state.note_menu.key === menuKey;
+          const stateName = live ? getStateName(live.state) : getStateName(note.state);
           return m('.note-item', [
             m('.note-box', {
               onclick: live ? (e) => {
@@ -619,7 +710,10 @@
                 state.note_menu = { key: menuKey, noteId: note.id, createdAt: note.created_at, right: window.innerWidth - rect.right, top: rect.top, pairIdx };
               } : undefined,
               style: live ? '' : 'cursor: default',
-            }, m('.note-content', note.content)),
+            }, [
+              stateName ? m('span.note-state-pill', stateName) : null,
+              m('.note-content', { style: stateName ? 'display: inline' : '' }, (live ? live.content : note.content)),
+            ]),
           ]);
         });
       }
@@ -693,6 +787,20 @@
                 if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
               },
             }, 'Edit'),
+            (() => {
+              const nextArg = getNextStateArg(menuNote);
+              if (!nextArg) return null;
+              const label = nextArg.slice(1); // remove leading /
+              return m('button', {
+                onclick: () => {
+                  state.input = `/note /id:${menuNote.id.slice(0, 7)} ${nextArg}`;
+                  state.collapsing = { pairIdx: menu.pairIdx };
+                  state.note_menu = null;
+                  const inp = document.querySelector('#input-row input');
+                  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+                },
+              }, label);
+            })(),
             m('button', {
               onclick: () => {
                 state.input = `/delete /id:${menuNote.id.slice(0, 7)}`;
