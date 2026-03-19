@@ -629,6 +629,7 @@
             style: `right: ${menu.right}px; top: ${menu.top}px;`,
             onclick: e => e.stopPropagation(),
           }, [
+            m('.note-popup-info', `id: ${menuNote.id.slice(0, 7)}`),
             m('.note-popup-info', `created: ${formatNoteDate(menu.createdAt)}`),
             m('button', {
               onclick: () => {
