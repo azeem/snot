@@ -576,7 +576,7 @@
     }
 
     function handleSubmit() {
-      const input = state.input.trim();
+      const input = state.input.trim().replace(/[\u201C\u201D]/g, '"');
       if (!input) return;
 
       const collapseCtx = state.collapsing;
