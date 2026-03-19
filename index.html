@@ -388,7 +388,7 @@
       },
       '/config': (input) => {
         const args = {};
-        input.replace(/\/(\w[^:\s]*):(?:"([^"]*)"|([^"\/\s]\S*))/g, (_, k, q, u) => { args[k] = q !== undefined ? q : u; });
+        input.replace(/\/(\w[^:\s]*):("[^"]*"|[^"\/\s]\S*)/g, (_, k, v) => { args[k] = v.startsWith('"') ? v.slice(1, -1) : v; });
         const keys = Object.keys(args).filter(k => k !== 'config');
         if (!keys.length) {
           const lines = Object.keys(CONFIG_DEFAULTS).map(k => {
