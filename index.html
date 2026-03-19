@@ -254,6 +254,11 @@
       tx.objectStore(CONFIG_STORE_NAME).put({ key, value });
     }
 
+    function dbConfigDelete(key) {
+      const tx = db.transaction(CONFIG_STORE_NAME, 'readwrite');
+      tx.objectStore(CONFIG_STORE_NAME).delete(key);
+    }
+
     function dbConfigGetAll() {
       return new Promise((resolve, reject) => {
         const tx = db.transaction(CONFIG_STORE_NAME, 'readonly');
@@ -324,7 +329,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /edit /id:<id> <text> — edit a note by id\n  /config [/list-limit:<int>] — view or set configuration' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /edit /id:<id> <text> — edit a note by id\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -365,6 +370,17 @@
         }
         const results = [];
         for (const k of keys) {
+          if (k === 'reset') {
+            const name = args[k];
+            if (!(name in CONFIG_DEFAULTS)) {
+              results.push(`Unknown config key: ${name}`);
+            } else {
+              delete userConfig[name];
+              if (db) dbConfigDelete(name);
+              results.push(`${name} reset to default (${CONFIG_DEFAULTS[name]})`);
+            }
+            continue;
+          }
           if (!(k in CONFIG_DEFAULTS)) {
             results.push(`Unknown config key: ${k}`);
             continue;
@@ -418,7 +434,7 @@
     const commandArgs = {
       '/list': ['/limit', '/offset'],
       '/edit': ['/id'],
-      '/config': ['/list-limit'],
+      '/config': ['/list-limit', '/reset'],
     };
 
     function isArgMode() {
