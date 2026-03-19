@@ -427,10 +427,11 @@
         }
         state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: results.join('\n') } });
       },
-      '/delete': (input) => {
+      '/delete': (input, collapseCtx) => {
         const ids = [];
         input.replace(/\/id:(\S+)/g, (_, v) => ids.push(v));
         if (!ids.length) {
+          if (collapseCtx) { showToast('Usage: /delete /id:<id> [/id:<id> ...]'); return; }
           state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /delete /id:<id> [/id:<id> ...]' } });
           return;
         }
@@ -443,8 +444,16 @@
           removed.push(note);
           if (db) dbDelete(note.id);
         }
+        if (collapseCtx) {
+          if (notFound.length) { showToast(`Not found: ${notFound.join(', ')}`); return; }
+          const pair = state.pairs[collapseCtx.pairIdx];
+          if (pair) {
+            state.pairs.splice(collapseCtx.pairIdx, 1);
+          }
+          return;
+        }
         const lines = [];
-        if (removed.length) lines.push(`Removed ${removed.length} note${removed.length > 1 ? 's' : ''}: ${removed.map(n => n.id.slice(0, 7)).join(', ')}`);
+        if (removed.length) lines.push(`Deleted ${removed.length} note${removed.length > 1 ? 's' : ''}: ${removed.map(n => n.id.slice(0, 7)).join(', ')}`);
         if (notFound.length) lines.push(`Not found: ${notFound.join(', ')}`);
         state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: lines.join('\n') } });
       },
@@ -673,6 +682,7 @@
             m('button', {
               onclick: () => {
                 state.input = `/delete /id:${menuNote.id.slice(0, 7)}`;
+                state.collapsing = { pairIdx: menu.pairIdx };
                 state.note_menu = null;
                 const inp = document.querySelector('#input-row input');
                 if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
