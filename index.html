@@ -243,6 +243,11 @@
       tx.objectStore(STORE_NAME).put(note);
     }
 
+    function dbDelete(id) {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete(id);
+    }
+
     function dbGetAll() {
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
@@ -332,7 +337,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /remove /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -422,11 +427,33 @@
         }
         state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: results.join('\n') } });
       },
+      '/remove': (input) => {
+        const ids = [];
+        input.replace(/\/id:(\S+)/g, (_, v) => ids.push(v));
+        if (!ids.length) {
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /remove /id:<id> [/id:<id> ...]' } });
+          return;
+        }
+        const removed = [];
+        const notFound = [];
+        for (const shortId of ids) {
+          const idx = state.notes.findIndex(n => n.id.startsWith(shortId));
+          if (idx === -1) { notFound.push(shortId); continue; }
+          const [note] = state.notes.splice(idx, 1);
+          removed.push(note);
+          if (db) dbDelete(note.id);
+        }
+        const lines = [];
+        if (removed.length) lines.push(`Removed ${removed.length} note${removed.length > 1 ? 's' : ''}: ${removed.map(n => n.id.slice(0, 7)).join(', ')}`);
+        if (notFound.length) lines.push(`Not found: ${notFound.join(', ')}`);
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: lines.join('\n') } });
+      },
     };
 
     const commandArgs = {
       '/list': ['/limit', '/offset'],
       '/note': ['/id'],
+      '/remove': ['/id'],
       '/config': ['/list-limit', '/reset'],
     };
 
