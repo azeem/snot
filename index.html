@@ -184,6 +184,12 @@
       min-width: 130px;
     }
 
+    .note-popup-info {
+      font-size: 0.75rem;
+      color: var(--pico-muted-color);
+      padding: 0.3rem 0.5rem 0.2rem;
+    }
+
     .note-popup button {
       margin: 0;
       text-align: left;
@@ -207,8 +213,9 @@
   <script>
     // IndexedDB setup
     const DB_NAME = 'snot';
-    const DB_VERSION = 2;
+    const DB_VERSION = 3;
     const STORE_NAME = 'notes';
+    const CONFIG_STORE_NAME = 'config';
     let db = null;
 
     function openDB() {
@@ -216,8 +223,12 @@
         const req = indexedDB.open(DB_NAME, DB_VERSION);
         req.onupgradeneeded = e => {
           const d = e.target.result;
-          if (d.objectStoreNames.contains(STORE_NAME)) d.deleteObjectStore(STORE_NAME);
-          d.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          if (!d.objectStoreNames.contains(STORE_NAME)) {
+            d.createObjectStore(STORE_NAME, { keyPath: 'id' });
+          }
+          if (!d.objectStoreNames.contains(CONFIG_STORE_NAME)) {
+            d.createObjectStore(CONFIG_STORE_NAME, { keyPath: 'key' });
+          }
         };
         req.onsuccess = e => resolve(e.target.result);
         req.onerror = e => reject(e.target.error);
@@ -237,6 +248,28 @@
         req.onerror = e => reject(e.target.error);
       });
     }
+
+    function dbConfigPut(key, value) {
+      const tx = db.transaction(CONFIG_STORE_NAME, 'readwrite');
+      tx.objectStore(CONFIG_STORE_NAME).put({ key, value });
+    }
+
+    function dbConfigDelete(key) {
+      const tx = db.transaction(CONFIG_STORE_NAME, 'readwrite');
+      tx.objectStore(CONFIG_STORE_NAME).delete(key);
+    }
+
+    function dbConfigGetAll() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(CONFIG_STORE_NAME, 'readonly');
+        const req = tx.objectStore(CONFIG_STORE_NAME).getAll();
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = e => reject(e.target.error);
+      });
+    }
+
+    const CONFIG_DEFAULTS = { 'list-limit': 10 };
+    const userConfig = {};
 
     const state = {
       pairs: [],
@@ -296,54 +329,119 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list — list most recent notes\n  /edit <id> <text> — edit a note by id' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
       },
       '/clear': () => {
         state.pairs = [];
         state.show_welcome = true;
       },
-      '/note': (input) => {
-        const content = input.replace(/^\/note\s*/i, '');
-        handleNote(content, input);
+      '/note': (input, collapseCtx) => {
+        const args = {};
+        input.replace(/\/(\w[^:\s]*):(\S+)/g, (_, k, v) => { args[k] = v; });
+        const text = input.replace(/^\/note\s*/i, '').replace(/\/\w[^:\s]*:\S+\s*/g, '').trim();
+        if (args.id) {
+          const note = state.notes.find(n => n.id.startsWith(args.id));
+          if (!note) {
+            if (collapseCtx) { showToast(`No note found with id: ${args.id}`); return; }
+            state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `No note found with id: ${args.id}` } });
+            return;
+          }
+          if (text) note.content = text;
+          if (collapseCtx) {
+            const pair = state.pairs[collapseCtx.pairIdx];
+            if (pair) {
+              pair.command = input + '\n' + pair.command;
+              state.pairs.splice(collapseCtx.pairIdx, 1);
+              state.pairs.unshift(pair);
+            }
+          } else {
+            state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes: [note] } });
+          }
+          if (db) dbPut(note);
+        } else {
+          handleNote(text, input);
+        }
       },
       '/list': (input) => {
-        const notes = state.notes.slice(-10).reverse();
-        if (!notes.length) {
+        const args = {};
+        input.replace(/\/(\w+):(\S+)/g, (_, k, v) => { args[k] = v; });
+        const defaultLimit = userConfig['list-limit'] !== undefined ? userConfig['list-limit'] : CONFIG_DEFAULTS['list-limit'];
+        const limit = Math.max(1, parseInt(args.limit) || defaultLimit);
+        const offset = Math.max(0, parseInt(args.offset) || 0);
+        const all = state.notes.slice().reverse();
+        const notes = all.slice(offset, offset + limit);
+        if (!all.length) {
           state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'No notes yet.' } });
+        } else if (!notes.length) {
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `No notes at offset ${offset}.` } });
         } else {
           state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes } });
         }
       },
-      '/edit': (input, collapseCtx) => {
-        const parts = input.replace(/^\/edit\s*/i, '').match(/^(\S+)\s+([\s\S]+)$/);
-        if (!parts) {
-          if (collapseCtx) { showToast('Usage: /edit <id> <new text>'); return; }
-          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /edit <id> <new text>' } });
+      '/config': (input) => {
+        const args = {};
+        input.replace(/\/(\w[^:\s]*):(\S+)/g, (_, k, v) => { args[k] = v; });
+        const keys = Object.keys(args).filter(k => k !== 'config');
+        if (!keys.length) {
+          const lines = Object.keys(CONFIG_DEFAULTS).map(k => {
+            const val = userConfig[k] !== undefined ? userConfig[k] : CONFIG_DEFAULTS[k];
+            const tag = userConfig[k] !== undefined ? '' : ' (default)';
+            return `  ${k}: ${val}${tag}`;
+          });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Configuration:\n' + lines.join('\n') } });
           return;
         }
-        const [, shortId, newContent] = parts;
-        const note = state.notes.find(n => n.id.startsWith(shortId));
-        if (!note) {
-          if (collapseCtx) { showToast(`No note found with id: ${shortId}`); return; }
-          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `No note found with id: ${shortId}` } });
-          return;
-        }
-        note.content = newContent.trim();
-        if (collapseCtx) {
-          const pair = state.pairs[collapseCtx.pairIdx];
-          if (pair) {
-            pair.command = input + '\n' + pair.command;
-            state.pairs.splice(collapseCtx.pairIdx, 1);
-            state.pairs.unshift(pair);
+        const results = [];
+        for (const k of keys) {
+          if (k === 'reset') {
+            const name = args[k];
+            if (!(name in CONFIG_DEFAULTS)) {
+              results.push(`Unknown config key: ${name}`);
+            } else {
+              delete userConfig[name];
+              if (db) dbConfigDelete(name);
+              results.push(`${name} reset to default (${CONFIG_DEFAULTS[name]})`);
+            }
+            continue;
           }
-        } else {
-          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes: [note] } });
+          if (!(k in CONFIG_DEFAULTS)) {
+            results.push(`Unknown config key: ${k}`);
+            continue;
+          }
+          const parsed = parseInt(args[k]);
+          if (isNaN(parsed) || parsed < 1) {
+            results.push(`Invalid value for ${k}: ${args[k]}`);
+            continue;
+          }
+          userConfig[k] = parsed;
+          if (db) dbConfigPut(k, parsed);
+          results.push(`${k} set to ${parsed}`);
         }
-        if (db) dbPut(note);
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: results.join('\n') } });
       },
     };
 
+    const commandArgs = {
+      '/list': ['/limit', '/offset'],
+      '/note': ['/id'],
+      '/config': ['/list-limit', '/reset'],
+    };
+
+    function isArgMode() {
+      const val = state.input;
+      if (!val.includes(' ')) return false;
+      const lastToken = val.split(' ').pop();
+      return lastToken.startsWith('/') && !lastToken.includes(':');
+    }
+
     function filteredCommands() {
+      if (isArgMode()) {
+        const parts = state.input.split(' ');
+        const cmdKey = parts[0].toLowerCase();
+        const lastToken = parts[parts.length - 1];
+        const usedArgs = parts.slice(1, -1).filter(p => p.startsWith('/') && p.includes(':')).map(p => p.split(':')[0]);
+        return (commandArgs[cmdKey] || []).filter(a => a.startsWith(lastToken) && !usedArgs.includes(a));
+      }
       const query = state.input.split(' ')[0].toLowerCase();
       return Object.keys(commands).filter(c => c.startsWith(query));
     }
@@ -353,8 +451,14 @@
       state.autocomplete_index = 0;
     }
 
-    function selectCommand(cmd) {
-      state.input = cmd + ' ';
+    function selectCommand(item) {
+      if (isArgMode()) {
+        const parts = state.input.split(' ');
+        parts[parts.length - 1] = item + ':';
+        state.input = parts.join(' ');
+      } else {
+        state.input = item + ' ';
+      }
       dismissAutocomplete();
     }
 
@@ -373,8 +477,11 @@
       if (state.collapsing && !val.includes(' ')) {
         state.collapsing = null;
       }
-      // Show/update autocomplete while typing a command
-      if (state.autocomplete || (val.startsWith('/') && val.indexOf(' ') === -1)) {
+      // Show/update autocomplete while typing a command or argument
+      const parts = val.split(' ');
+      const lastToken = parts[parts.length - 1];
+      const inArgMode = val.startsWith('/') && parts.length > 1 && lastToken.startsWith('/') && !lastToken.includes(':');
+      if (state.autocomplete || (val.startsWith('/') && val.indexOf(' ') === -1) || inArgMode) {
         state.autocomplete = true;
         state.autocomplete_index = 0;
       } else {
@@ -451,13 +558,12 @@
           const menuKey = `${pairIdx}_${note.id}`;
           const menuOpen = state.note_menu && state.note_menu.key === menuKey;
           return m('.note-item', [
-            m('.note-meta', formatNoteDate(note.created_at)),
             m('.note-box', {
               onclick: live ? (e) => {
                 e.stopPropagation();
                 if (menuOpen) { state.note_menu = null; return; }
                 const rect = e.currentTarget.getBoundingClientRect();
-                state.note_menu = { key: menuKey, noteId: note.id, right: window.innerWidth - rect.right, top: rect.top, pairIdx };
+                state.note_menu = { key: menuKey, noteId: note.id, createdAt: note.created_at, right: window.innerWidth - rect.right, top: rect.top, pairIdx };
               } : undefined,
               style: live ? '' : 'cursor: default',
             }, m('.note-content', note.content)),
@@ -523,9 +629,10 @@
             style: `right: ${menu.right}px; top: ${menu.top}px;`,
             onclick: e => e.stopPropagation(),
           }, [
+            m('.note-popup-info', `created: ${formatNoteDate(menu.createdAt)}`),
             m('button', {
               onclick: () => {
-                state.input = `/edit ${menuNote.id.slice(0, 7)} ${menuNote.content}`;
+                state.input = `/edit /id:${menuNote.id.slice(0, 7)} ${menuNote.content}`;
                 state.collapsing = { pairIdx: menu.pairIdx };
                 state.note_menu = null;
                 const inp = document.querySelector('#input-row input');
@@ -541,9 +648,10 @@
 
     openDB().then(database => {
       db = database;
-      return dbGetAll();
-    }).then(notes => {
+      return Promise.all([dbGetAll(), dbConfigGetAll()]);
+    }).then(([notes, configRows]) => {
       state.notes = notes.sort((a, b) => a.created_at - b.created_at);
+      configRows.forEach(row => { userConfig[row.key] = row.value; });
       m.redraw();
     }).catch(err => console.error('IndexedDB error:', err));
 
