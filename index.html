@@ -187,7 +187,10 @@
     .note-popup-info {
       font-size: 0.75rem;
       color: var(--pico-muted-color);
-      padding: 0.3rem 0.5rem 0.2rem;
+      padding: 0.3rem 0.5rem 0;
+    }
+    .note-popup-info + .note-popup-info {
+      padding-top: 0;
     }
 
     .note-popup button {
@@ -240,6 +243,11 @@
       tx.objectStore(STORE_NAME).put(note);
     }
 
+    function dbDelete(id) {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).delete(id);
+    }
+
     function dbGetAll() {
       return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, 'readonly');
@@ -268,7 +276,7 @@
       });
     }
 
-    const CONFIG_DEFAULTS = { 'list-limit': 10 };
+    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list' };
     const userConfig = {};
 
     const state = {
@@ -329,7 +337,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /delete /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/startup:"<cmd>"] [/reset:<config-name>] — view or set configuration' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -380,7 +388,8 @@
       },
       '/config': (input) => {
         const args = {};
-        input.replace(/\/(\w[^:\s]*):(\S+)/g, (_, k, v) => { args[k] = v; });
+        input.replace(/\/(\w[^:\s]*):"([^"]*)"/g, (_, k, v) => { args[k] = v; });
+        input.replace(/\/(\w[^:\s]*):([^"\/\s]\S*)/g, (_, k, v) => { if (!(k in args)) args[k] = v; });
         const keys = Object.keys(args).filter(k => k !== 'config');
         if (!keys.length) {
           const lines = Object.keys(CONFIG_DEFAULTS).map(k => {
@@ -408,6 +417,12 @@
             results.push(`Unknown config key: ${k}`);
             continue;
           }
+          if (k === 'startup') {
+            userConfig[k] = args[k];
+            if (db) dbConfigPut(k, args[k]);
+            results.push(`${k} set to ${args[k]}`);
+            continue;
+          }
           const parsed = parseInt(args[k]);
           if (isNaN(parsed) || parsed < 1) {
             results.push(`Invalid value for ${k}: ${args[k]}`);
@@ -419,12 +434,50 @@
         }
         state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: results.join('\n') } });
       },
+      '/delete': (input, collapseCtx) => {
+        const ids = [];
+        input.replace(/\/id:(\S+)/g, (_, v) => ids.push(v));
+        if (!ids.length) {
+          if (collapseCtx) { showToast('Usage: /delete /id:<id> [/id:<id> ...]'); return; }
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /delete /id:<id> [/id:<id> ...]' } });
+          return;
+        }
+        const removed = [];
+        const notFound = [];
+        for (const shortId of ids) {
+          const idx = state.notes.findIndex(n => n.id.startsWith(shortId));
+          if (idx === -1) { notFound.push(shortId); continue; }
+          const [note] = state.notes.splice(idx, 1);
+          removed.push(note);
+          if (db) dbDelete(note.id);
+        }
+        if (collapseCtx) {
+          if (notFound.length) { showToast(`Not found: ${notFound.join(', ')}`); return; }
+          const pair = state.pairs[collapseCtx.pairIdx];
+          if (pair && pair.response.type === 'notes') {
+            pair.command = input + '\n' + pair.command;
+            const removedIds = new Set(removed.map(n => n.id));
+            pair.response.notes = pair.response.notes.filter(n => !removedIds.has(n.id));
+            if (pair.response.notes.length === 0) {
+              state.pairs.splice(collapseCtx.pairIdx, 1);
+            }
+          } else if (pair) {
+            state.pairs.splice(collapseCtx.pairIdx, 1);
+          }
+          return;
+        }
+        const lines = [];
+        if (removed.length) lines.push(`Deleted ${removed.length} note${removed.length > 1 ? 's' : ''}: ${removed.map(n => n.id.slice(0, 7)).join(', ')}`);
+        if (notFound.length) lines.push(`Not found: ${notFound.join(', ')}`);
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: lines.join('\n') } });
+      },
     };
 
     const commandArgs = {
       '/list': ['/limit', '/offset'],
       '/note': ['/id'],
-      '/config': ['/list-limit', '/reset'],
+      '/delete': ['/id'],
+      '/config': ['/list-limit', '/startup', '/reset'],
     };
 
     function isArgMode() {
@@ -523,7 +576,7 @@
     }
 
     function handleSubmit() {
-      const input = state.input.trim();
+      const input = state.input.trim().replace(/[\u201C\u201D]/g, '"');
       if (!input) return;
 
       const collapseCtx = state.collapsing;
@@ -629,16 +682,26 @@
             style: `right: ${menu.right}px; top: ${menu.top}px;`,
             onclick: e => e.stopPropagation(),
           }, [
+            m('.note-popup-info', `id: ${menuNote.id.slice(0, 7)}`),
             m('.note-popup-info', `created: ${formatNoteDate(menu.createdAt)}`),
             m('button', {
               onclick: () => {
-                state.input = `/edit /id:${menuNote.id.slice(0, 7)} ${menuNote.content}`;
+                state.input = `/note /id:${menuNote.id.slice(0, 7)} ${menuNote.content}`;
                 state.collapsing = { pairIdx: menu.pairIdx };
                 state.note_menu = null;
                 const inp = document.querySelector('#input-row input');
                 if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
               },
             }, 'Edit'),
+            m('button', {
+              onclick: () => {
+                state.input = `/delete /id:${menuNote.id.slice(0, 7)}`;
+                state.collapsing = { pairIdx: menu.pairIdx };
+                state.note_menu = null;
+                const inp = document.querySelector('#input-row input');
+                if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+              },
+            }, 'Delete'),
           ]) : null,
         ]);
       }
@@ -652,6 +715,13 @@
     }).then(([notes, configRows]) => {
       state.notes = notes.sort((a, b) => a.created_at - b.created_at);
       configRows.forEach(row => { userConfig[row.key] = row.value; });
+      const startupCmd = userConfig['startup'] !== undefined ? userConfig['startup'] : CONFIG_DEFAULTS['startup'];
+      if (startupCmd) {
+        state.show_welcome = false;
+        const cmdKey = startupCmd.split(' ')[0].toLowerCase();
+        const cmd = commands[cmdKey];
+        if (cmd) cmd(startupCmd, null);
+      }
       m.redraw();
     }).catch(err => console.error('IndexedDB error:', err));
 
