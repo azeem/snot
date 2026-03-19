@@ -215,11 +215,26 @@
       font-weight: 600;
       padding: 0.1rem 0.4rem;
       border-radius: 0.25rem;
-      background: var(--pico-primary-background);
-      color: var(--pico-primary-inverse);
+      background: var(--pill-bg, var(--pico-secondary-background));
+      color: var(--pill-color, var(--pico-secondary-inverse));
       margin-right: 0.4rem;
       vertical-align: middle;
       line-height: 1.5;
+    }
+
+    .note-state-pill.pill-new {
+      --pill-bg: var(--pico-primary-background);
+      --pill-color: var(--pico-primary-inverse);
+    }
+
+    .note-state-pill.pill-active {
+      --pill-bg: #c85000;
+      --pill-color: #fff;
+    }
+
+    .note-state-pill.pill-success {
+      --pill-bg: #1a7f37;
+      --pill-color: #fff;
     }
   </style>
 </head>
@@ -289,7 +304,7 @@
       });
     }
 
-    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL' };
+    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL', 'new-state': 'INBOX', 'active-state': 'TODO', 'success-state': 'DONE' };
     const userConfig = {};
 
     const state = {
@@ -358,6 +373,16 @@
       if (cur === null || cur === undefined) return '/' + names[0];
       if (cur >= names.length - 1) return '/NULL';
       return '/' + names[cur + 1];
+    }
+
+    function getStatePillClass(stateName) {
+      if (!stateName) return '';
+      const upper = stateName.toUpperCase();
+      const get = k => ((userConfig[k] !== undefined ? userConfig[k] : CONFIG_DEFAULTS[k]) + '').toUpperCase();
+      if (upper === get('new-state')) return 'pill-new';
+      if (upper === get('active-state')) return 'pill-active';
+      if (upper === get('success-state')) return 'pill-success';
+      return '';
     }
 
     function createNote(content) {
@@ -496,7 +521,7 @@
             results.push(`${k} set to ${val}`);
             continue;
           }
-          if (k === 'default-state') {
+          if (k === 'default-state' || k === 'new-state' || k === 'active-state' || k === 'success-state') {
             const val = args[k].toUpperCase();
             userConfig[k] = val;
             if (db) dbConfigPut(k, val);
@@ -563,7 +588,7 @@
     }
 
     function getConfigArgs() {
-      return ['/list-limit', '/startup', '/reset', '/state-names', '/default-state'];
+      return ['/list-limit', '/startup', '/reset', '/state-names', '/default-state', '/new-state', '/active-state', '/success-state'];
     }
 
     function isArgMode() {
@@ -713,7 +738,7 @@
               } : undefined,
               style: live ? '' : 'cursor: default',
             }, [
-              stateName ? m('span.note-state-pill', stateName) : null,
+              stateName ? m('span.note-state-pill' + (getStatePillClass(stateName) ? '.' + getStatePillClass(stateName) : ''), stateName) : null,
               m('.note-content', { style: stateName ? 'display: inline' : '' }, (live ? live.content : note.content)),
             ]),
           ]);
