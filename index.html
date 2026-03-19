@@ -337,7 +337,7 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /remove /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /delete /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -427,11 +427,11 @@
         }
         state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: results.join('\n') } });
       },
-      '/remove': (input) => {
+      '/delete': (input) => {
         const ids = [];
         input.replace(/\/id:(\S+)/g, (_, v) => ids.push(v));
         if (!ids.length) {
-          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /remove /id:<id> [/id:<id> ...]' } });
+          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /delete /id:<id> [/id:<id> ...]' } });
           return;
         }
         const removed = [];
@@ -453,7 +453,7 @@
     const commandArgs = {
       '/list': ['/limit', '/offset'],
       '/note': ['/id'],
-      '/remove': ['/id'],
+      '/delete': ['/id'],
       '/config': ['/list-limit', '/reset'],
     };
 
@@ -670,6 +670,14 @@
                 if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
               },
             }, 'Edit'),
+            m('button', {
+              onclick: () => {
+                state.input = `/delete /id:${menuNote.id.slice(0, 7)}`;
+                state.note_menu = null;
+                const inp = document.querySelector('#input-row input');
+                if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+              },
+            }, 'Delete'),
           ]) : null,
         ]);
       }
