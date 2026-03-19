@@ -636,7 +636,7 @@
             m('.note-popup-info', `created: ${formatNoteDate(menu.createdAt)}`),
             m('button', {
               onclick: () => {
-                state.input = `/edit /id:${menuNote.id.slice(0, 7)} ${menuNote.content}`;
+                state.input = `/note /id:${menuNote.id.slice(0, 7)} ${menuNote.content}`;
                 state.collapsing = { pairIdx: menu.pairIdx };
                 state.note_menu = null;
                 const inp = document.querySelector('#input-row input');
