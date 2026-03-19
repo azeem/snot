@@ -448,6 +448,7 @@
           if (notFound.length) { showToast(`Not found: ${notFound.join(', ')}`); return; }
           const pair = state.pairs[collapseCtx.pairIdx];
           if (pair && pair.response.type === 'notes') {
+            pair.command = input + '\n' + pair.command;
             const removedIds = new Set(removed.map(n => n.id));
             pair.response.notes = pair.response.notes.filter(n => !removedIds.has(n.id));
             if (pair.response.notes.length === 0) {
