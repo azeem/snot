@@ -329,15 +329,38 @@
 
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note — create a note\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /edit /id:<id> <text> — edit a note by id\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/reset:<config-name>] — view or set configuration' } });
       },
       '/clear': () => {
         state.pairs = [];
         state.show_welcome = true;
       },
-      '/note': (input) => {
-        const content = input.replace(/^\/note\s*/i, '');
-        handleNote(content, input);
+      '/note': (input, collapseCtx) => {
+        const args = {};
+        input.replace(/\/(\w[^:\s]*):(\S+)/g, (_, k, v) => { args[k] = v; });
+        const text = input.replace(/^\/note\s*/i, '').replace(/\/\w[^:\s]*:\S+\s*/g, '').trim();
+        if (args.id) {
+          const note = state.notes.find(n => n.id.startsWith(args.id));
+          if (!note) {
+            if (collapseCtx) { showToast(`No note found with id: ${args.id}`); return; }
+            state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `No note found with id: ${args.id}` } });
+            return;
+          }
+          if (text) note.content = text;
+          if (collapseCtx) {
+            const pair = state.pairs[collapseCtx.pairIdx];
+            if (pair) {
+              pair.command = input + '\n' + pair.command;
+              state.pairs.splice(collapseCtx.pairIdx, 1);
+              state.pairs.unshift(pair);
+            }
+          } else {
+            state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes: [note] } });
+          }
+          if (db) dbPut(note);
+        } else {
+          handleNote(text, input);
+        }
       },
       '/list': (input) => {
         const args = {};
@@ -396,44 +419,11 @@
         }
         state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: results.join('\n') } });
       },
-      '/edit': (input, collapseCtx) => {
-        const idMatch = input.match(/\/id:(\S+)/);
-        if (!idMatch) {
-          if (collapseCtx) { showToast('Usage: /edit /id:<id> <new text>'); return; }
-          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /edit /id:<id> <new text>' } });
-          return;
-        }
-        const shortId = idMatch[1];
-        const newContent = input.replace(/^\/edit\s*/i, '').replace(/\/id:\S+\s*/, '').trim();
-        if (!newContent) {
-          if (collapseCtx) { showToast('Usage: /edit /id:<id> <new text>'); return; }
-          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Usage: /edit /id:<id> <new text>' } });
-          return;
-        }
-        const note = state.notes.find(n => n.id.startsWith(shortId));
-        if (!note) {
-          if (collapseCtx) { showToast(`No note found with id: ${shortId}`); return; }
-          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: `No note found with id: ${shortId}` } });
-          return;
-        }
-        note.content = newContent.trim();
-        if (collapseCtx) {
-          const pair = state.pairs[collapseCtx.pairIdx];
-          if (pair) {
-            pair.command = input + '\n' + pair.command;
-            state.pairs.splice(collapseCtx.pairIdx, 1);
-            state.pairs.unshift(pair);
-          }
-        } else {
-          state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'notes', notes: [note] } });
-        }
-        if (db) dbPut(note);
-      },
     };
 
     const commandArgs = {
       '/list': ['/limit', '/offset'],
-      '/edit': ['/id'],
+      '/note': ['/id'],
       '/config': ['/list-limit', '/reset'],
     };
 
