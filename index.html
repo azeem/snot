@@ -597,7 +597,9 @@
     function selectCommand(item) {
       if (isArgMode()) {
         const parts = state.input.split(' ');
-        parts[parts.length - 1] = item + ':';
+        const noValueArgs = new Set(['/NULL', ...getStateNames().map(n => '/' + n)]);
+        const suffix = noValueArgs.has(item.toUpperCase()) ? ' ' : ':';
+        parts[parts.length - 1] = item + suffix;
         state.input = parts.join(' ');
       } else {
         state.input = item + ' ';
@@ -624,7 +626,7 @@
       const parts = val.split(' ');
       const lastToken = parts[parts.length - 1];
       const inArgMode = val.startsWith('/') && parts.length > 1 && lastToken.startsWith('/') && !lastToken.includes(':');
-      if (state.autocomplete || (val.startsWith('/') && val.indexOf(' ') === -1) || inArgMode) {
+      if ((val.startsWith('/') && val.indexOf(' ') === -1) || inArgMode) {
         state.autocomplete = true;
         state.autocomplete_index = 0;
       } else {
