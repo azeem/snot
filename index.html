@@ -447,7 +447,13 @@
         if (collapseCtx) {
           if (notFound.length) { showToast(`Not found: ${notFound.join(', ')}`); return; }
           const pair = state.pairs[collapseCtx.pairIdx];
-          if (pair) {
+          if (pair && pair.response.type === 'notes') {
+            const removedIds = new Set(removed.map(n => n.id));
+            pair.response.notes = pair.response.notes.filter(n => !removedIds.has(n.id));
+            if (pair.response.notes.length === 0) {
+              state.pairs.splice(collapseCtx.pairIdx, 1);
+            }
+          } else if (pair) {
             state.pairs.splice(collapseCtx.pairIdx, 1);
           }
           return;
