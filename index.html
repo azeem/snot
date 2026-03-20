@@ -72,6 +72,57 @@
       font-size: 0.9rem;
     }
 
+    .help {
+      white-space: normal;
+      font-size: 0.875rem;
+    }
+
+    .help h4 {
+      margin: 0.6rem 0 0.3rem;
+      font-size: 0.875rem;
+    }
+
+    .help h4:first-child {
+      margin-top: 0;
+    }
+
+    .help ul {
+      margin: 0 0 0.5rem;
+      padding-left: 1.1rem;
+    }
+
+    .help li {
+      margin-bottom: 0.2rem;
+      line-height: 1.5;
+    }
+
+    .help table {
+      margin: 0;
+      font-size: 0.8rem;
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    .help th, .help td {
+      padding: 0.2rem 0.6rem 0.2rem 0;
+      text-align: left;
+      vertical-align: top;
+      border: none;
+    }
+
+    .help th {
+      color: var(--pico-muted-color);
+      font-weight: 600;
+      padding-bottom: 0.3rem;
+    }
+
+    .help code {
+      font-size: 0.8rem;
+      background: var(--pico-code-background, rgba(0,0,0,0.06));
+      padding: 0.05rem 0.3rem;
+      border-radius: 0.2rem;
+    }
+
     #input-row {
       display: flex;
       gap: 0.5rem;
@@ -401,9 +452,38 @@
       if (db) dbPut(note);
     }
 
+    function buildHelpMarkup() {
+      const c = text => m('code', text);
+      const row = (key, def, desc) => m('tr', [m('td', c(key)), m('td', c(def)), m('td', desc)]);
+      return m('.help', [
+        m('h4', 'Commands'),
+        m('ul', [
+          m('li', [c('/note'), ' ', c('[/id:<id>] [/<state>|/NULL] [<text>]'), ' — create a note or edit one by id; include a state arg to set/clear state']),
+          m('li', [c('/list'), ' ', c('[/limit:<n>] [/offset:<n>]'), ' — list most recent notes']),
+          m('li', [c('/delete'), ' ', c('/id:<id> …'), ' — remove one or more notes']),
+          m('li', [c('/config'), ' ', c('[/key:value …]'), ' — view or set configuration']),
+          m('li', [c('/clear'), ' — clear all messages']),
+          m('li', [c('/help'), ' — show this help']),
+        ]),
+        m('h4', 'Configuration'),
+        m('table', [
+          m('thead', m('tr', [m('th', 'Key'), m('th', 'Default'), m('th', 'Description')])),
+          m('tbody', [
+            row('list-limit', '10', 'Max notes returned by /list'),
+            row('startup', '/list', 'Command run at startup'),
+            row('state-names', 'INBOX,TODO,DONE,ARCHIVE', 'Comma-separated state enumeration'),
+            row('default-state', 'NULL', 'State assigned to new notes'),
+            row('new-state', 'INBOX', 'State name with primary-color pill'),
+            row('active-state', 'TODO', 'State name with orange pill'),
+            row('success-state', 'DONE', 'State name with green pill'),
+          ]),
+        ]),
+      ]);
+    }
+
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [/<state>] [/NULL] [<text>] — create a note, or edit an existing one by id; use a state name or /NULL to set/clear state\n  /delete /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/startup:"<cmd>"] [/state-names:<names>] [/default-state:<name>] [/reset:<config-name>] — view or set configuration' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'markup', content: buildHelpMarkup() } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -722,6 +802,7 @@
     function renderResponse(response, pairIdx) {
       if (!response || typeof response === 'string') return response;
       if (response.type === 'text') return response.content;
+      if (response.type === 'markup') return response.content;
       if (response.type === 'notes') {
         return response.notes.map(note => {
           const live = state.notes.find(n => n.id === note.id);
