@@ -388,7 +388,7 @@
       flex-direction: row;
       align-items: center;
       justify-content: center;
-      gap: 0.2rem;
+      gap: 0.45rem;
       min-height: 2.8rem;
       width: auto;
       margin: 0;
@@ -409,18 +409,31 @@
     .kb-alt {
       font-size: 0.95rem;
       font-weight: 400;
-      color: var(--pico-muted-color);
+      color: #1a8a47;
       line-height: 1;
     }
 
     #custom-keyboard.alt-mode .kb-alt {
-      color: var(--pico-primary);
+      color: #1a8a47;
       font-weight: 700;
     }
 
     #custom-keyboard.alt-mode .kb-primary {
       color: var(--pico-muted-color);
       font-weight: 400;
+    }
+
+    .kb-caps-mode {
+      flex: 1;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .kb-caps-mode.active {
+      background: #b45a00;
+      color: #fff;
+      border-color: #b45a00;
     }
 
     .kb-utility-row {
@@ -434,7 +447,7 @@
     }
 
     .kb-space {
-      flex: 2;
+      flex: 1.5;
       font-size: 0.75rem;
       font-weight: 400;
       letter-spacing: 0.05em;
@@ -607,6 +620,8 @@
       kb_sequence: [],
       kb_alt_seq: [],
       kb_alt_mode: false,
+      kb_caps_seq: [],
+      kb_caps_mode: false,
       kb_suggestions: [],
     };
 
@@ -623,6 +638,8 @@
       state.kb_sequence = [];
       state.kb_alt_seq = [];
       state.kb_alt_mode = false;
+      state.kb_caps_seq = [];
+      state.kb_caps_mode = false;
       state.kb_suggestions = [];
       m.redraw();
     }
@@ -636,7 +653,10 @@
     }
 
     function getRawWord() {
-      return state.kb_sequence.map((i, pos) => T9_KEYS[i][state.kb_alt_seq[pos] ? 1 : 0]).join('');
+      return state.kb_sequence.map((i, pos) => {
+        const ch = T9_KEYS[i][state.kb_alt_seq[pos] ? 1 : 0];
+        return state.kb_caps_seq[pos] ? ch.toUpperCase() : ch;
+      }).join('');
     }
 
     function handleT9AltMode() {
@@ -644,10 +664,17 @@
       m.redraw();
     }
 
+    function handleT9CapsMode() {
+      state.kb_caps_mode = !state.kb_caps_mode;
+      m.redraw();
+    }
+
     function handleT9Key(keyIdx) {
       state.kb_sequence.push(keyIdx);
       state.kb_alt_seq.push(state.kb_alt_mode);
+      state.kb_caps_seq.push(state.kb_caps_mode);
       state.kb_alt_mode = false;
+      state.kb_caps_mode = false;
       updateT9Suggestions();
       m.redraw();
     }
@@ -656,6 +683,7 @@
       if (state.kb_sequence.length > 0) {
         state.kb_sequence.pop();
         state.kb_alt_seq.pop();
+        state.kb_caps_seq.pop();
         updateT9Suggestions();
       } else {
         state.input = state.input.slice(0, -1);
@@ -669,6 +697,8 @@
         state.kb_sequence = [];
         state.kb_alt_seq = [];
         state.kb_alt_mode = false;
+        state.kb_caps_seq = [];
+        state.kb_caps_mode = false;
         state.kb_suggestions = [];
       } else {
         state.input += ' ';
@@ -682,6 +712,8 @@
         state.kb_sequence = [];
         state.kb_alt_seq = [];
         state.kb_alt_mode = false;
+        state.kb_caps_seq = [];
+        state.kb_caps_mode = false;
         state.kb_suggestions = [];
       }
       state.kb_visible = false;
@@ -1090,6 +1122,8 @@
         state.kb_sequence = [];
         state.kb_alt_seq = [];
         state.kb_alt_mode = false;
+        state.kb_caps_seq = [];
+        state.kb_caps_mode = false;
         state.kb_suggestions = [];
       }
       const input = state.input.trim().replace(/[\u201C\u201D]/g, '"');
@@ -1102,6 +1136,8 @@
       state.kb_sequence = [];
       state.kb_alt_seq = [];
       state.kb_alt_mode = false;
+      state.kb_caps_seq = [];
+      state.kb_caps_mode = false;
       state.kb_suggestions = [];
       state.kb_visible = false;
       state.collapsing = null;
@@ -1169,7 +1205,8 @@
         const hasPending = sequence.length > 0;
         const rows = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]];
         const combos = hasPending && !suggestions.length ? t9AllCombos(sequence) : [];
-        return m('#custom-keyboard', { class: state.kb_alt_mode ? 'alt-mode' : '' }, [
+        const kbClass = [state.kb_alt_mode ? 'alt-mode' : '', state.kb_caps_mode ? 'caps-mode' : ''].filter(Boolean).join(' ');
+        return m('#custom-keyboard', { class: kbClass }, [
           m('#kb-suggestions', [
             m('button.kb-dismiss', {
               onmousedown: e => e.preventDefault(),
@@ -1223,6 +1260,12 @@
               onclick: handleT9AltMode,
               title: 'Next key uses alternate character',
             }, 'ALT'),
+            m('button.kb-key.kb-caps-mode', {
+              class: state.kb_caps_mode ? 'active' : '',
+              onmousedown: e => e.preventDefault(),
+              onclick: handleT9CapsMode,
+              title: 'Next key is uppercase',
+            }, '\u21E7'),
             m('button.kb-key.kb-space', {
               onmousedown: e => e.preventDefault(),
               onclick: handleT9Space,
@@ -1276,6 +1319,8 @@
                 state.kb_sequence = [];
                 state.kb_alt_seq = [];
                 state.kb_alt_mode = false;
+                state.kb_caps_seq = [];
+                state.kb_caps_mode = false;
                 state.kb_suggestions = [];
                 state.collapsing = null;
                 dismissAutocomplete();
