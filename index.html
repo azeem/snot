@@ -287,6 +287,127 @@
       --pill-bg: #1a7f37;
       --pill-color: #fff;
     }
+
+    /* Custom T9 Keyboard */
+    #custom-keyboard {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      max-width: 720px;
+      margin: 0 auto;
+      background: var(--pico-card-sectioning-background-color, #f4f4f4);
+      border-top: 1px solid var(--pico-muted-border-color);
+      padding: 0.4rem 0.35rem 0.5rem;
+      z-index: 1100;
+      user-select: none;
+    }
+
+    #kb-suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      padding: 0.2rem 0.1rem 0.4rem;
+      min-height: 2rem;
+    }
+
+    .kb-suggestion {
+      background: var(--pico-primary-background);
+      color: var(--pico-primary-inverse);
+      border: none;
+      border-radius: 1rem;
+      padding: 0.2rem 0.75rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+      line-height: 1.4;
+      width: auto;
+      margin: 0;
+    }
+
+    .kb-no-match {
+      color: var(--pico-muted-color);
+      font-size: 0.9rem;
+      padding: 0.2rem 0.5rem;
+      font-style: italic;
+    }
+
+    .kb-add-word {
+      background: none;
+      border: 1px dashed var(--pico-muted-border-color);
+      border-radius: 1rem;
+      padding: 0.2rem 0.65rem;
+      font-size: 0.8rem;
+      color: var(--pico-muted-color);
+      cursor: pointer;
+      width: auto;
+      margin: 0;
+    }
+
+    .kb-row {
+      display: flex;
+      gap: 0.3rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .kb-key {
+      flex: 1;
+      position: relative;
+      background: var(--pico-background-color, #fff);
+      border: 1px solid var(--pico-muted-border-color);
+      border-radius: 0.35rem;
+      padding: 0.5rem 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      font-weight: 600;
+      min-height: 2.8rem;
+      width: auto;
+      margin: 0;
+      color: var(--pico-color);
+    }
+
+    .kb-key:active {
+      background: var(--pico-card-sectioning-background-color, #e8e8e8);
+    }
+
+    .kb-primary {
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .kb-alt {
+      position: absolute;
+      top: 0.2rem;
+      right: 0.3rem;
+      font-size: 0.55rem;
+      font-weight: 400;
+      color: var(--pico-muted-color);
+      line-height: 1;
+    }
+
+    .kb-utility-row {
+      gap: 0.3rem;
+      margin-bottom: 0;
+    }
+
+    .kb-backspace {
+      flex: 1;
+      font-size: 1.1rem;
+    }
+
+    .kb-space {
+      flex: 3;
+      font-size: 0.75rem;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+    }
+
+    .kb-submit {
+      flex: 1;
+      font-size: 1.1rem;
+    }
   </style>
 </head>
 <body>
@@ -295,9 +416,10 @@
   <script>
     // IndexedDB setup
     const DB_NAME = 'snot';
-    const DB_VERSION = 3;
+    const DB_VERSION = 4;
     const STORE_NAME = 'notes';
     const CONFIG_STORE_NAME = 'config';
+    const DICT_STORE = 'dictionary';
     let db = null;
 
     function openDB() {
@@ -310,6 +432,9 @@
           }
           if (!d.objectStoreNames.contains(CONFIG_STORE_NAME)) {
             d.createObjectStore(CONFIG_STORE_NAME, { keyPath: 'key' });
+          }
+          if (!d.objectStoreNames.contains(DICT_STORE)) {
+            d.createObjectStore(DICT_STORE, { keyPath: 'word' });
           }
         };
         req.onsuccess = e => resolve(e.target.result);
@@ -355,8 +480,69 @@
       });
     }
 
+    function dbDictGetAll() {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(DICT_STORE, 'readonly');
+        const req = tx.objectStore(DICT_STORE).getAll();
+        req.onsuccess = e => resolve(e.target.result.map(r => r.word));
+        req.onerror = e => reject(e.target.error);
+      });
+    }
+
+    function dbDictPut(word) {
+      const tx = db.transaction(DICT_STORE, 'readwrite');
+      tx.objectStore(DICT_STORE).put({ word });
+    }
+
+    function dbDictSeedIfEmpty(words) {
+      return new Promise((resolve) => {
+        const tx = db.transaction(DICT_STORE, 'readwrite');
+        const store = tx.objectStore(DICT_STORE);
+        const countReq = store.count();
+        countReq.onsuccess = e => {
+          if (e.target.result === 0) {
+            words.forEach(w => store.put({ word: w }));
+          }
+          resolve();
+        };
+        countReq.onerror = () => resolve();
+      });
+    }
+
     const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL', 'new-state': 'INBOX', 'active-state': 'TODO', 'success-state': 'DONE' };
     const userConfig = {};
+
+    // T9 keyboard: key map. Each entry: [primaryChar, altChar]. 5 rows of 4 keys + utility row.
+    const T9_KEYS = [
+      ['1','0'], ['2','9'], ['3','8'], ['4','7'], ['5','6'],
+      ['q','p'], ['w','o'], ['e','i'], ['r','u'], ['t','y'],
+      ['a',';'], ['s','l'], ['d','k'], ['f','j'], ['g','h'],
+      ['z','n'], ['x','m'], ['c',','], ['v','.'], ['b','/'],
+    ];
+
+    const CHAR_TO_KEY = {};
+    T9_KEYS.forEach((pair, idx) => { pair.forEach(ch => { CHAR_TO_KEY[ch] = idx; }); });
+
+    let dictWords = [];
+
+    // ~1500 common English words for the initial dictionary seed
+    const SEED_WORDS = `the of and to a in is it you that he was for on are with as his they be at one have this from or had by hot but some what there we can out other were all your when up use word how said an each she which do their time if will way about many then them write would like so these her long make thing see him two has look more day could go come did number sound no most people my over know water than call first who may down side been now find any new work part take get place made live where after back little only round man year came show every good me give our under name very through just form sentence great think say help low line differ turn cause much mean before move right boy old too same tell does set three want air well also play small end put home read hand port large spell add even land here must big high such follow act why ask men change went light kind off need house picture try us again animal point mother world near build self earth father head stand own page should country found answer school grow study still learn plant cover food sun four between state keep eye never last let thought city tree cross farm hard start might story saw far sea draw left late run while press close night real life few north open seem together next white children begin got walk example ease paper group always music those both mark often letter until mile river car feet care second enough plain girl usual young ready above ever red list though feel talk bird soon body dog family direct pose leave song measure door product black short numeral class wind question happen complete ship area half rock order fire south problem piece told knew pass since top whole king space heard best hour better true during hundred five remember step early hold west ground interest reach fast verb sing listen six table travel less morning ten simple several vowel toward war lay against pattern slow center love person money serve appear road map rain rule govern pull cold notice voice unit power town fine certain fly fall lead cry dark machine note wait plan figure star box noun field rest correct able pound done beauty drive stood contain front teach week final gave green oh quick develop ocean warm free minute strong special heavy diamond window sharp matter friend floor beautiful within often process clear deep full mark sure red small old even mean keep children feet side face wood between able seem head later become plan real felt hundred city trees run cut face base started follow love road soon last together next car below paper days white hundred soon group feet letter took science eat room friend began idea fish mountain stop once base hear horse cut sure watch color face wood main open seem half life always those both form sentence often letter enough plain young ready above ever list while main along watch those real light put end does large door hand move spell let back again animal then also two help between take every near add food keep children school start might story cross farm hard`;
+
+    function t9Lookup(sequence) {
+      if (!sequence.length) return [];
+      const len = sequence.length;
+      return dictWords.filter(word => {
+        if (word.length !== len) return false;
+        for (let i = 0; i < len; i++) {
+          if (CHAR_TO_KEY[word[i]] !== sequence[i]) return false;
+        }
+        return true;
+      });
+    }
+
+    function updateT9Suggestions() {
+      state.kb_suggestions = t9Lookup(state.kb_sequence);
+    }
 
     const state = {
       pairs: [],
@@ -368,6 +554,9 @@
       note_menu: null,
       collapsing: null,
       toast: null,
+      kb_visible: false,
+      kb_sequence: [],
+      kb_suggestions: [],
     };
 
     let _toastTimer = null;
@@ -375,6 +564,61 @@
       state.toast = msg;
       clearTimeout(_toastTimer);
       _toastTimer = setTimeout(() => { state.toast = null; m.redraw(); }, 3000);
+      m.redraw();
+    }
+
+    function commitWord(word) {
+      state.input += word + ' ';
+      state.kb_sequence = [];
+      state.kb_suggestions = [];
+      m.redraw();
+    }
+
+    function addWordToDictionary(word) {
+      if (!word || dictWords.includes(word)) { commitWord(word); return; }
+      dictWords.push(word);
+      if (db) dbDictPut(word);
+      commitWord(word);
+      showToast(`Added "${word}" to dictionary`);
+    }
+
+    function handleT9Key(keyIdx) {
+      state.kb_sequence.push(keyIdx);
+      updateT9Suggestions();
+      m.redraw();
+    }
+
+    function handleT9Backspace() {
+      if (state.kb_sequence.length > 0) {
+        state.kb_sequence.pop();
+        updateT9Suggestions();
+      } else {
+        state.input = state.input.slice(0, -1);
+      }
+      m.redraw();
+    }
+
+    function handleT9Space() {
+      if (state.kb_sequence.length > 0) {
+        const rawWord = state.kb_sequence.map(i => T9_KEYS[i][0]).join('');
+        state.input += rawWord + ' ';
+        state.kb_sequence = [];
+        state.kb_suggestions = [];
+      } else {
+        state.input += ' ';
+      }
+      m.redraw();
+    }
+
+    function handleT9Submit() {
+      if (state.kb_sequence.length > 0) {
+        const rawWord = state.kb_sequence.map(i => T9_KEYS[i][0]).join('');
+        state.input += rawWord;
+        state.kb_sequence = [];
+        state.kb_suggestions = [];
+      }
+      state.kb_visible = false;
+      handleSubmit();
       m.redraw();
     }
 
@@ -773,6 +1017,13 @@
     }
 
     function handleSubmit() {
+      // Commit any pending T9 sequence before submitting
+      if (state.kb_sequence.length > 0) {
+        const rawWord = state.kb_sequence.map(i => T9_KEYS[i][0]).join('');
+        state.input = (state.input + rawWord).trim();
+        state.kb_sequence = [];
+        state.kb_suggestions = [];
+      }
       const input = state.input.trim().replace(/[\u201C\u201D]/g, '"');
       if (!input) return;
 
@@ -780,6 +1031,9 @@
       dismissAutocomplete();
       state.show_welcome = false;
       state.input = '';
+      state.kb_sequence = [];
+      state.kb_suggestions = [];
+      state.kb_visible = false;
       state.collapsing = null;
 
       if (input.startsWith('/')) {
@@ -827,6 +1081,62 @@
       }
     }
 
+    const CustomKeyboard = {
+      view() {
+        if (!state.kb_visible) return null;
+        const sequence = state.kb_sequence;
+        const rawPreview = sequence.map(i => T9_KEYS[i][0]).join('');
+        const suggestions = state.kb_suggestions;
+        const hasPending = sequence.length > 0;
+        const rows = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]];
+        return m('#custom-keyboard', [
+          m('#kb-suggestions', [
+            hasPending && !suggestions.length
+              ? m('span.kb-no-match', rawPreview)
+              : null,
+            ...suggestions.map(word =>
+              m('button.kb-suggestion', {
+                onmousedown: e => e.preventDefault(),
+                onclick: () => commitWord(word),
+              }, word)
+            ),
+            hasPending
+              ? m('button.kb-add-word', {
+                  onmousedown: e => e.preventDefault(),
+                  onclick: () => addWordToDictionary(rawPreview),
+                  title: 'Add to dictionary',
+                }, '+ add "' + rawPreview + '"')
+              : null,
+          ]),
+          ...rows.map(rowIndices =>
+            m('.kb-row', rowIndices.map(keyIdx =>
+              m('button.kb-key', {
+                onmousedown: e => e.preventDefault(),
+                onclick: () => handleT9Key(keyIdx),
+              }, [
+                m('span.kb-primary', T9_KEYS[keyIdx][0]),
+                m('span.kb-alt', T9_KEYS[keyIdx][1]),
+              ])
+            ))
+          ),
+          m('.kb-row.kb-utility-row', [
+            m('button.kb-key.kb-backspace', {
+              onmousedown: e => e.preventDefault(),
+              onclick: handleT9Backspace,
+            }, '\u232B'),
+            m('button.kb-key.kb-space', {
+              onmousedown: e => e.preventDefault(),
+              onclick: handleT9Space,
+            }, 'SPACE'),
+            m('button.kb-key.kb-submit', {
+              onmousedown: e => e.preventDefault(),
+              onclick: handleT9Submit,
+            }, '\u23CE'),
+          ]),
+        ]);
+      }
+    };
+
     const App = {
       oncreate() {
         document.addEventListener('click', () => {
@@ -838,14 +1148,18 @@
         const menu = state.note_menu;
         const menuNote = menu && state.notes.find(n => n.id === menu.noteId);
         return m('main', [
+          m(CustomKeyboard),
           m('#input-row', [
             m('#input-wrapper', [
               m('input', {
                 type: 'text',
                 placeholder: 'Type a note or /command...',
                 value: state.input,
+                inputmode: 'none',
                 oninput: handleInput,
                 onkeydown: handleKeydown,
+                onfocus: () => { state.kb_visible = true; m.redraw(); },
+                onblur: () => { setTimeout(() => { state.kb_visible = false; m.redraw(); }, 150); },
                 autofocus: true,
               }),
               state.autocomplete && items.length
@@ -857,10 +1171,12 @@
                   ))
                 : null,
             ]),
-            state.input ? m('button#clear-btn', {
+            state.input || state.kb_sequence.length ? m('button#clear-btn', {
               onmousedown: e => e.preventDefault(),
               onclick: () => {
                 state.input = '';
+                state.kb_sequence = [];
+                state.kb_suggestions = [];
                 state.collapsing = null;
                 dismissAutocomplete();
                 document.querySelector('#input-row input').focus();
@@ -927,10 +1243,13 @@
 
     openDB().then(database => {
       db = database;
-      return Promise.all([dbGetAll(), dbConfigGetAll()]);
-    }).then(([notes, configRows]) => {
+      return dbDictSeedIfEmpty(SEED_WORDS.trim().split(/\s+/).filter(Boolean));
+    }).then(() => {
+      return Promise.all([dbGetAll(), dbConfigGetAll(), dbDictGetAll()]);
+    }).then(([notes, configRows, words]) => {
       state.notes = notes.sort((a, b) => a.created_at - b.created_at);
       configRows.forEach(row => { userConfig[row.key] = row.value; });
+      dictWords = words;
       const startupCmd = userConfig['startup'] !== undefined ? userConfig['startup'] : CONFIG_DEFAULTS['startup'];
       if (startupCmd) {
         state.show_welcome = false;
