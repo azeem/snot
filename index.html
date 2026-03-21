@@ -287,6 +287,93 @@
       --pill-bg: #1a7f37;
       --pill-color: #fff;
     }
+
+    #custom-keyboard {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--pico-card-sectioning-background-color, #f0f0f0);
+      border-top: 1px solid var(--pico-muted-border-color);
+      padding: 0.4rem 0.25rem 0.6rem;
+      z-index: 1100;
+    }
+
+    .kb-shorthands {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 0.3rem;
+      padding: 0 0.25rem 0.35rem;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .kb-shorthands::-webkit-scrollbar { display: none; }
+
+    .kb-row {
+      display: flex;
+      justify-content: center;
+      gap: 0.25rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .kb-key {
+      flex: 1;
+      max-width: 2.6rem;
+      min-width: 1.6rem;
+      height: 2.6rem;
+      padding: 0;
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 500;
+      border-radius: 0.35rem;
+      border: 1px solid var(--pico-muted-border-color);
+      background: var(--pico-background-color, #fff);
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .kb-key.kb-wide {
+      max-width: 4rem;
+      flex: 1.6;
+      font-size: 0.85rem;
+    }
+
+    .kb-key.kb-spacebar {
+      flex: 5;
+      max-width: none;
+      font-size: 0.75rem;
+      color: var(--pico-muted-color);
+    }
+
+    .kb-key.kb-enter {
+      background: var(--pico-primary-background);
+      color: var(--pico-primary-inverse);
+      border-color: var(--pico-primary-background);
+    }
+
+    .kb-key.kb-active {
+      background: var(--pico-secondary-background);
+      color: var(--pico-secondary-inverse);
+    }
+
+    .kb-shorthand {
+      white-space: nowrap;
+      flex-shrink: 0;
+      height: 2rem;
+      padding: 0 0.65rem;
+      font-size: 0.78rem;
+      border-radius: 1rem;
+      border: 1px solid var(--pico-muted-border-color);
+      background: var(--pico-background-color, #fff);
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
   </style>
 </head>
 <body>
@@ -368,7 +455,11 @@
       note_menu: null,
       collapsing: null,
       toast: null,
+      is_touch: ('ontouchstart' in window || navigator.maxTouchPoints > 0),
+      keyboard_visible: false,
     };
+
+    const kbState = { shift: false, capslock: false };
 
     let _toastTimer = null;
     function showToast(msg) {
@@ -712,8 +803,7 @@
       dismissAutocomplete();
     }
 
-    function handleInput(e) {
-      const val = e.target.value;
+    function handleInputValue(val) {
       // Space as first character: replace with / and show autocomplete
       if (val === ' ') {
         state.input = '/';
@@ -738,6 +828,116 @@
         state.autocomplete = false;
       }
     }
+
+    function handleInput(e) {
+      handleInputValue(e.target.value);
+    }
+
+    function kbPress(key) {
+      if (key === 'BACKSPACE') {
+        handleInputValue(state.input.slice(0, -1));
+        m.redraw();
+        return;
+      }
+      if (key === 'ENTER') {
+        if (state.autocomplete) {
+          const items = filteredCommands();
+          if (items.length) selectCommand(items[state.autocomplete_index]);
+        } else {
+          handleSubmit();
+        }
+        m.redraw();
+        return;
+      }
+      if (key === 'SHIFT') {
+        kbState.shift = !kbState.shift;
+        m.redraw();
+        return;
+      }
+      if (key === 'CAPS') {
+        kbState.capslock = !kbState.capslock;
+        kbState.shift = false;
+        m.redraw();
+        return;
+      }
+      if (key === 'SPACE') {
+        handleInputValue(state.input + ' ');
+        m.redraw();
+        return;
+      }
+      // Regular character
+      const upper = kbState.capslock || kbState.shift;
+      const char = upper ? key.toUpperCase() : key.toLowerCase();
+      if (kbState.shift) kbState.shift = false;
+      handleInputValue(state.input + char);
+      m.redraw();
+    }
+
+    const KB_ROWS = [
+      ['1','2','3','4','5','6','7','8','9','0'],
+      ['q','w','e','r','t','y','u','i','o','p'],
+      ['a','s','d','f','g','h','j','k','l'],
+      ['SHIFT','z','x','c','v','b','n','m','BACKSPACE'],
+      ['SPACE','ENTER'],
+    ];
+
+    const KB_SHORTHANDS = [
+      { label: 'TODO:',  value: 'TODO: '  },
+      { label: 'IDEA:',  value: 'IDEA: '  },
+      { label: 'NOTE:',  value: 'NOTE: '  },
+      { label: 'FIX:',   value: 'FIX: '   },
+      { label: 'REF:',   value: 'REF: '   },
+      { label: 'today',  value: () => new Date().toISOString().slice(0,10) + ' ' },
+      { label: '/list',  value: '/list'   },
+      { label: '/note ', value: '/note '  },
+      { label: '/tag ',  value: '/tag '   },
+    ];
+
+    const CustomKeyboard = {
+      view() {
+        if (!state.keyboard_visible) return null;
+        const isUpper = kbState.shift || kbState.capslock;
+
+        const renderKey = (key) => {
+          let label = key;
+          let cls = 'kb-key';
+          if (key === 'BACKSPACE') { label = '⌫'; cls += ' kb-wide'; }
+          else if (key === 'SHIFT') { label = '⇧'; cls += ' kb-wide' + (isUpper ? ' kb-active' : ''); }
+          else if (key === 'SPACE') { label = 'space'; cls += ' kb-spacebar'; }
+          else if (key === 'ENTER') { label = '↵'; cls += ' kb-wide kb-enter'; }
+          else { label = isUpper ? key.toUpperCase() : key; }
+
+          return m('button', {
+            class: cls,
+            onmousedown: e => e.preventDefault(),
+            ontouchstart: e => { e.preventDefault(); kbPress(key); },
+            onclick: e => { e.preventDefault(); kbPress(key); },
+          }, label);
+        };
+
+        const renderShorthand = (sh) => m('button', {
+          class: 'kb-shorthand',
+          onmousedown: e => e.preventDefault(),
+          ontouchstart: e => {
+            e.preventDefault();
+            const val = typeof sh.value === 'function' ? sh.value() : sh.value;
+            handleInputValue(state.input + val);
+            m.redraw();
+          },
+          onclick: e => {
+            e.preventDefault();
+            const val = typeof sh.value === 'function' ? sh.value() : sh.value;
+            handleInputValue(state.input + val);
+            m.redraw();
+          },
+        }, sh.label);
+
+        return m('#custom-keyboard', [
+          m('.kb-shorthands', KB_SHORTHANDS.map(renderShorthand)),
+          ...KB_ROWS.map(row => m('.kb-row', row.map(renderKey))),
+        ]);
+      }
+    };
 
     function handleKeydown(e) {
       if (state.autocomplete) {
@@ -847,6 +1047,17 @@
                 oninput: handleInput,
                 onkeydown: handleKeydown,
                 autofocus: true,
+                inputmode: state.is_touch ? 'none' : undefined,
+                onfocus: () => {
+                  if (state.is_touch) { state.keyboard_visible = true; m.redraw(); }
+                },
+                onblur: e => {
+                  const rel = e.relatedTarget;
+                  if (!rel || !rel.closest('#custom-keyboard')) {
+                    state.keyboard_visible = false;
+                    m.redraw();
+                  }
+                },
               }),
               state.autocomplete && items.length
                 ? m('#autocomplete', items.map((cmd, i) =>
@@ -867,6 +1078,7 @@
               },
             }, '×') : null,
           ]),
+          m(CustomKeyboard),
           state.show_welcome
             ? m('p.muted', { style: 'color: var(--pico-muted-color); font-size: 0.9rem;' }, 'Welcome to snot. Type a note or /help for commands.')
             : null,
