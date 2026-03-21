@@ -379,17 +379,16 @@
 
     .kb-key {
       flex: 1;
-      position: relative;
       background: var(--pico-background-color, #fff);
       border: 1px solid var(--pico-muted-border-color);
       border-radius: 0.35rem;
-      padding: 0.5rem 0;
+      padding: 0.5rem 0.15rem;
       cursor: pointer;
       display: flex;
+      flex-direction: row;
       align-items: center;
       justify-content: center;
-      font-size: 1.1rem;
-      font-weight: 600;
+      gap: 0.2rem;
       min-height: 2.8rem;
       width: auto;
       margin: 0;
@@ -401,18 +400,27 @@
     }
 
     .kb-primary {
-      font-size: 1.1rem;
+      font-size: 0.95rem;
+      font-weight: 700;
       line-height: 1;
+      color: var(--pico-color);
     }
 
     .kb-alt {
-      position: absolute;
-      top: 0.15rem;
-      right: 0.25rem;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       font-weight: 400;
       color: var(--pico-muted-color);
       line-height: 1;
+    }
+
+    #custom-keyboard.alt-mode .kb-alt {
+      color: var(--pico-primary);
+      font-weight: 700;
+    }
+
+    #custom-keyboard.alt-mode .kb-primary {
+      color: var(--pico-muted-color);
+      font-weight: 400;
     }
 
     .kb-utility-row {
@@ -426,10 +434,23 @@
     }
 
     .kb-space {
-      flex: 3;
+      flex: 2;
       font-size: 0.75rem;
       font-weight: 400;
       letter-spacing: 0.05em;
+    }
+
+    .kb-alt-mode {
+      flex: 1;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .kb-alt-mode.active {
+      background: var(--pico-primary-background);
+      color: var(--pico-primary-inverse);
+      border-color: var(--pico-primary-border);
     }
 
     .kb-submit {
@@ -584,6 +605,8 @@
       toast: null,
       kb_visible: false,
       kb_sequence: [],
+      kb_alt_seq: [],
+      kb_alt_mode: false,
       kb_suggestions: [],
     };
 
@@ -598,6 +621,8 @@
     function commitWord(word) {
       state.input += word + ' ';
       state.kb_sequence = [];
+      state.kb_alt_seq = [];
+      state.kb_alt_mode = false;
       state.kb_suggestions = [];
       m.redraw();
     }
@@ -610,8 +635,19 @@
       showToast(`Added "${word}" to dictionary`);
     }
 
+    function getRawWord() {
+      return state.kb_sequence.map((i, pos) => T9_KEYS[i][state.kb_alt_seq[pos] ? 1 : 0]).join('');
+    }
+
+    function handleT9AltMode() {
+      state.kb_alt_mode = !state.kb_alt_mode;
+      m.redraw();
+    }
+
     function handleT9Key(keyIdx) {
       state.kb_sequence.push(keyIdx);
+      state.kb_alt_seq.push(state.kb_alt_mode);
+      state.kb_alt_mode = false;
       updateT9Suggestions();
       m.redraw();
     }
@@ -619,6 +655,7 @@
     function handleT9Backspace() {
       if (state.kb_sequence.length > 0) {
         state.kb_sequence.pop();
+        state.kb_alt_seq.pop();
         updateT9Suggestions();
       } else {
         state.input = state.input.slice(0, -1);
@@ -628,9 +665,10 @@
 
     function handleT9Space() {
       if (state.kb_sequence.length > 0) {
-        const rawWord = state.kb_sequence.map(i => T9_KEYS[i][0]).join('');
-        state.input += rawWord + ' ';
+        state.input += getRawWord() + ' ';
         state.kb_sequence = [];
+        state.kb_alt_seq = [];
+        state.kb_alt_mode = false;
         state.kb_suggestions = [];
       } else {
         state.input += ' ';
@@ -640,9 +678,10 @@
 
     function handleT9Submit() {
       if (state.kb_sequence.length > 0) {
-        const rawWord = state.kb_sequence.map(i => T9_KEYS[i][0]).join('');
-        state.input += rawWord;
+        state.input += getRawWord();
         state.kb_sequence = [];
+        state.kb_alt_seq = [];
+        state.kb_alt_mode = false;
         state.kb_suggestions = [];
       }
       state.kb_visible = false;
@@ -1047,9 +1086,10 @@
     function handleSubmit() {
       // Commit any pending T9 sequence before submitting
       if (state.kb_sequence.length > 0) {
-        const rawWord = state.kb_sequence.map(i => T9_KEYS[i][0]).join('');
-        state.input = (state.input + rawWord).trim();
+        state.input = (state.input + getRawWord()).trim();
         state.kb_sequence = [];
+        state.kb_alt_seq = [];
+        state.kb_alt_mode = false;
         state.kb_suggestions = [];
       }
       const input = state.input.trim().replace(/[\u201C\u201D]/g, '"');
@@ -1060,6 +1100,8 @@
       state.show_welcome = false;
       state.input = '';
       state.kb_sequence = [];
+      state.kb_alt_seq = [];
+      state.kb_alt_mode = false;
       state.kb_suggestions = [];
       state.kb_visible = false;
       state.collapsing = null;
@@ -1122,12 +1164,12 @@
       view() {
         if (!state.kb_visible) return null;
         const sequence = state.kb_sequence;
-        const rawPreview = sequence.map(i => T9_KEYS[i][0]).join('');
+        const rawPreview = getRawWord();
         const suggestions = state.kb_suggestions.slice().sort();
         const hasPending = sequence.length > 0;
         const rows = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]];
         const combos = hasPending && !suggestions.length ? t9AllCombos(sequence) : [];
-        return m('#custom-keyboard', [
+        return m('#custom-keyboard', { class: state.kb_alt_mode ? 'alt-mode' : '' }, [
           m('#kb-suggestions', [
             m('button.kb-dismiss', {
               onmousedown: e => e.preventDefault(),
@@ -1175,6 +1217,12 @@
               onmousedown: e => e.preventDefault(),
               onclick: handleT9Backspace,
             }, '\u232B'),
+            m('button.kb-key.kb-alt-mode', {
+              class: state.kb_alt_mode ? 'active' : '',
+              onmousedown: e => e.preventDefault(),
+              onclick: handleT9AltMode,
+              title: 'Next key uses alternate character',
+            }, 'ALT'),
             m('button.kb-key.kb-space', {
               onmousedown: e => e.preventDefault(),
               onclick: handleT9Space,
@@ -1226,6 +1274,8 @@
               onclick: () => {
                 state.input = '';
                 state.kb_sequence = [];
+                state.kb_alt_seq = [];
+                state.kb_alt_mode = false;
                 state.kb_suggestions = [];
                 state.collapsing = null;
                 dismissAutocomplete();
