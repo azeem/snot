@@ -72,6 +72,57 @@
       font-size: 0.9rem;
     }
 
+    .help {
+      white-space: normal;
+      font-size: 0.875rem;
+    }
+
+    .help h4 {
+      margin: 0.6rem 0 0.3rem;
+      font-size: 0.875rem;
+    }
+
+    .help h4:first-child {
+      margin-top: 0;
+    }
+
+    .help ul {
+      margin: 0 0 0.5rem;
+      padding-left: 1.1rem;
+    }
+
+    .help li {
+      margin-bottom: 0.2rem;
+      line-height: 1.5;
+    }
+
+    .help table {
+      margin: 0;
+      font-size: 0.8rem;
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    .help th, .help td {
+      padding: 0.2rem 0.6rem 0.2rem 0;
+      text-align: left;
+      vertical-align: top;
+      border: none;
+    }
+
+    .help th {
+      color: var(--pico-muted-color);
+      font-weight: 600;
+      padding-bottom: 0.3rem;
+    }
+
+    .help code {
+      font-size: 0.8rem;
+      background: var(--pico-code-background, rgba(0,0,0,0.06));
+      padding: 0.05rem 0.3rem;
+      border-radius: 0.2rem;
+    }
+
     #input-row {
       display: flex;
       gap: 0.5rem;
@@ -208,6 +259,34 @@
     .note-popup button:hover {
       background: var(--pico-muted-background-color, #f4f4f4);
     }
+
+    .note-state-pill {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.1rem 0.4rem;
+      border-radius: 0.25rem;
+      background: var(--pill-bg, var(--pico-secondary-background));
+      color: var(--pill-color, var(--pico-secondary-inverse));
+      margin-right: 0.4rem;
+      vertical-align: middle;
+      line-height: 1.5;
+    }
+
+    .note-state-pill.pill-new {
+      --pill-bg: var(--pico-primary-background);
+      --pill-color: var(--pico-primary-inverse);
+    }
+
+    .note-state-pill.pill-active {
+      --pill-bg: #c85000;
+      --pill-color: #fff;
+    }
+
+    .note-state-pill.pill-success {
+      --pill-bg: #1a7f37;
+      --pill-color: #fff;
+    }
   </style>
 </head>
 <body>
@@ -276,7 +355,7 @@
       });
     }
 
-    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list' };
+    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL', 'new-state': 'INBOX', 'active-state': 'TODO', 'success-state': 'DONE' };
     const userConfig = {};
 
     const state = {
@@ -319,8 +398,46 @@
       );
     }
 
+    function getStateNames() {
+      const raw = userConfig['state-names'] !== undefined ? userConfig['state-names'] : CONFIG_DEFAULTS['state-names'];
+      return raw.split(',').map(s => s.trim().toUpperCase()).filter(s => s && s !== 'NULL');
+    }
+
+    function getDefaultStateIndex() {
+      const def = ((userConfig['default-state'] !== undefined ? userConfig['default-state'] : CONFIG_DEFAULTS['default-state']) + '').toUpperCase();
+      if (def === 'NULL') return null;
+      const names = getStateNames();
+      const idx = names.indexOf(def);
+      return idx === -1 ? null : idx;
+    }
+
+    function getStateName(stateIdx) {
+      if (stateIdx === null || stateIdx === undefined) return null;
+      const names = getStateNames();
+      return names[stateIdx] !== undefined ? names[stateIdx] : null;
+    }
+
+    function getNextStateArg(note) {
+      const names = getStateNames();
+      if (!names.length) return null;
+      const cur = note.state;
+      if (cur === null || cur === undefined) return '/' + names[0];
+      if (cur >= names.length - 1) return '/NULL';
+      return '/' + names[cur + 1];
+    }
+
+    function getStatePillClass(stateName) {
+      if (!stateName) return '';
+      const upper = stateName.toUpperCase();
+      const get = k => ((userConfig[k] !== undefined ? userConfig[k] : CONFIG_DEFAULTS[k]) + '').toUpperCase();
+      if (upper === get('new-state')) return 'pill-new';
+      if (upper === get('active-state')) return 'pill-active';
+      if (upper === get('success-state')) return 'pill-success';
+      return '';
+    }
+
     function createNote(content) {
-      return { id: generateUUID(), content, created_at: Date.now() };
+      return { id: generateUUID(), content, created_at: Date.now(), state: getDefaultStateIndex() };
     }
 
     function handleNote(input, displayCommand) {
@@ -335,9 +452,38 @@
       if (db) dbPut(note);
     }
 
+    function buildHelpMarkup() {
+      const c = text => m('code', text);
+      const row = (key, def, desc) => m('tr', [m('td', c(key)), m('td', c(def)), m('td', desc)]);
+      return m('.help', [
+        m('h4', 'Commands'),
+        m('ul', [
+          m('li', [c('/note'), ' ', c('[/id:<id>] [/<state>|/NULL] [<text>]'), ' — create a note or edit one by id; include a state arg to set/clear state']),
+          m('li', [c('/list'), ' ', c('[/limit:<n>] [/offset:<n>]'), ' — list most recent notes']),
+          m('li', [c('/delete'), ' ', c('/id:<id> …'), ' — remove one or more notes']),
+          m('li', [c('/config'), ' ', c('[/key:value …]'), ' — view or set configuration']),
+          m('li', [c('/clear'), ' — clear all messages']),
+          m('li', [c('/help'), ' — show this help']),
+        ]),
+        m('h4', 'Configuration'),
+        m('table', [
+          m('thead', m('tr', [m('th', 'Key'), m('th', 'Default'), m('th', 'Description')])),
+          m('tbody', [
+            row('list-limit', '10', 'Max notes returned by /list'),
+            row('startup', '/list', 'Command run at startup'),
+            row('state-names', 'INBOX,TODO,DONE,ARCHIVE', 'Comma-separated state enumeration'),
+            row('default-state', 'NULL', 'State assigned to new notes'),
+            row('new-state', 'INBOX', 'State name with primary-color pill'),
+            row('active-state', 'TODO', 'State name with orange pill'),
+            row('success-state', 'DONE', 'State name with green pill'),
+          ]),
+        ]),
+      ]);
+    }
+
     const commands = {
       '/help': (input) => {
-        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'text', content: 'Commands:\n  /help — show this help\n  /clear — clear all messages\n  /note [/id:<id>] [<text>] — create a note, or edit an existing one by id\n  /delete /id:<id> [/id:<id> ...] — remove one or more notes by id\n  /list [/limit:<int>] [/offset:<int>] — list most recent notes\n  /config [/list-limit:<int>] [/startup:"<cmd>"] [/reset:<config-name>] — view or set configuration' } });
+        state.pairs.unshift({ pairId: generateUUID(), command: input, response: { type: 'markup', content: buildHelpMarkup() } });
       },
       '/clear': () => {
         state.pairs = [];
@@ -346,7 +492,22 @@
       '/note': (input, collapseCtx) => {
         const args = {};
         input.replace(/\/(\w[^:\s]*):(\S+)/g, (_, k, v) => { args[k] = v; });
-        const text = input.replace(/^\/note\s*/i, '').replace(/\/\w[^:\s]*:\S+\s*/g, '').trim();
+        // Parse state args: /STATENAME or /NULL (no colon, after command)
+        const stateNames = getStateNames();
+        let newState = undefined; // undefined = don't change
+        const inputAfterCmd = input.replace(/^\/note\s*/i, '');
+        inputAfterCmd.replace(/\/([A-Za-z][A-Za-z0-9]*)(?=\s|$)/g, (_, name) => {
+          const upper = name.toUpperCase();
+          if (upper === 'NULL') {
+            newState = null;
+          } else {
+            const idx = stateNames.indexOf(upper);
+            if (idx !== -1) newState = idx;
+          }
+        });
+        // Build state pattern to strip from text
+        const statePattern = new RegExp('\\/(?:NULL|' + (stateNames.length ? stateNames.join('|') : 'XNOMATCH') + ')(?=\\s|$)\\s*', 'gi');
+        const text = inputAfterCmd.replace(/\/\w[^:\s]*:\S+\s*/g, '').replace(statePattern, '').trim();
         if (args.id) {
           const note = state.notes.find(n => n.id.startsWith(args.id));
           if (!note) {
@@ -355,6 +516,7 @@
             return;
           }
           if (text) note.content = text;
+          if (newState !== undefined) note.state = newState;
           if (collapseCtx) {
             const pair = state.pairs[collapseCtx.pairIdx];
             if (pair) {
@@ -423,6 +585,29 @@
             results.push(`${k} set to ${args[k]}`);
             continue;
           }
+          if (k === 'state-names') {
+            const parts = args[k].split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+            if (parts.includes('NULL')) {
+              results.push(`Invalid value for state-names: NULL is not allowed as a state name`);
+              continue;
+            }
+            if (!parts.length) {
+              results.push(`Invalid value for state-names: must have at least one name`);
+              continue;
+            }
+            const val = parts.join(',');
+            userConfig[k] = val;
+            if (db) dbConfigPut(k, val);
+            results.push(`${k} set to ${val}`);
+            continue;
+          }
+          if (k === 'default-state' || k === 'new-state' || k === 'active-state' || k === 'success-state') {
+            const val = args[k].toUpperCase();
+            userConfig[k] = val;
+            if (db) dbConfigPut(k, val);
+            results.push(`${k} set to ${val}`);
+            continue;
+          }
           const parsed = parseInt(args[k]);
           if (isNaN(parsed) || parsed < 1) {
             results.push(`Invalid value for ${k}: ${args[k]}`);
@@ -475,10 +660,16 @@
 
     const commandArgs = {
       '/list': ['/limit', '/offset'],
-      '/note': ['/id'],
       '/delete': ['/id'],
-      '/config': ['/list-limit', '/startup', '/reset'],
     };
+
+    function getNoteArgs() {
+      return ['/id', '/NULL', ...getStateNames().map(n => '/' + n)];
+    }
+
+    function getConfigArgs() {
+      return ['/list-limit', '/startup', '/reset', '/state-names', '/default-state', '/new-state', '/active-state', '/success-state'];
+    }
 
     function isArgMode() {
       const val = state.input;
@@ -493,7 +684,11 @@
         const cmdKey = parts[0].toLowerCase();
         const lastToken = parts[parts.length - 1];
         const usedArgs = parts.slice(1, -1).filter(p => p.startsWith('/') && p.includes(':')).map(p => p.split(':')[0]);
-        return (commandArgs[cmdKey] || []).filter(a => a.startsWith(lastToken) && !usedArgs.includes(a));
+        let argList;
+        if (cmdKey === '/note') argList = getNoteArgs();
+        else if (cmdKey === '/config') argList = getConfigArgs();
+        else argList = commandArgs[cmdKey] || [];
+        return argList.filter(a => a.startsWith(lastToken) && !usedArgs.includes(a));
       }
       const query = state.input.split(' ')[0].toLowerCase();
       return Object.keys(commands).filter(c => c.startsWith(query));
@@ -507,7 +702,9 @@
     function selectCommand(item) {
       if (isArgMode()) {
         const parts = state.input.split(' ');
-        parts[parts.length - 1] = item + ':';
+        const noValueArgs = new Set(['/NULL', ...getStateNames().map(n => '/' + n)]);
+        const suffix = noValueArgs.has(item.toUpperCase()) ? ' ' : ':';
+        parts[parts.length - 1] = item + suffix;
         state.input = parts.join(' ');
       } else {
         state.input = item + ' ';
@@ -534,7 +731,7 @@
       const parts = val.split(' ');
       const lastToken = parts[parts.length - 1];
       const inArgMode = val.startsWith('/') && parts.length > 1 && lastToken.startsWith('/') && !lastToken.includes(':');
-      if (state.autocomplete || (val.startsWith('/') && val.indexOf(' ') === -1) || inArgMode) {
+      if ((val.startsWith('/') && val.indexOf(' ') === -1) || inArgMode) {
         state.autocomplete = true;
         state.autocomplete_index = 0;
       } else {
@@ -605,11 +802,13 @@
     function renderResponse(response, pairIdx) {
       if (!response || typeof response === 'string') return response;
       if (response.type === 'text') return response.content;
+      if (response.type === 'markup') return response.content;
       if (response.type === 'notes') {
         return response.notes.map(note => {
           const live = state.notes.find(n => n.id === note.id);
           const menuKey = `${pairIdx}_${note.id}`;
           const menuOpen = state.note_menu && state.note_menu.key === menuKey;
+          const stateName = live ? getStateName(live.state) : getStateName(note.state);
           return m('.note-item', [
             m('.note-box', {
               onclick: live ? (e) => {
@@ -619,7 +818,10 @@
                 state.note_menu = { key: menuKey, noteId: note.id, createdAt: note.created_at, right: window.innerWidth - rect.right, top: rect.top, pairIdx };
               } : undefined,
               style: live ? '' : 'cursor: default',
-            }, m('.note-content', note.content)),
+            }, [
+              stateName ? m('span.note-state-pill' + (getStatePillClass(stateName) ? '.' + getStatePillClass(stateName) : ''), stateName) : null,
+              m('.note-content', { style: stateName ? 'display: inline' : '' }, (live ? live.content : note.content)),
+            ]),
           ]);
         });
       }
@@ -693,6 +895,20 @@
                 if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
               },
             }, 'Edit'),
+            (() => {
+              const nextArg = getNextStateArg(menuNote);
+              if (!nextArg) return null;
+              const label = nextArg.slice(1); // remove leading /
+              return m('button', {
+                onclick: () => {
+                  state.input = `/note /id:${menuNote.id.slice(0, 7)} ${nextArg}`;
+                  state.collapsing = { pairIdx: menu.pairIdx };
+                  state.note_menu = null;
+                  const inp = document.querySelector('#input-row input');
+                  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+                },
+              }, label);
+            })(),
             m('button', {
               onclick: () => {
                 state.input = `/delete /id:${menuNote.id.slice(0, 7)}`;
