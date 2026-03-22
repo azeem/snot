@@ -114,7 +114,7 @@ window._kbLoaded = true;
       flex-direction: row;
       align-items: center;
       justify-content: center;
-      gap: 0.45rem;
+      gap: 0.6rem;
       min-height: 2.8rem;
       width: auto;
       margin: 0;
@@ -139,14 +139,10 @@ window._kbLoaded = true;
       line-height: 1;
     }
 
-    .kb-sep {
-      font-size: 0.7rem;
-      font-weight: 300;
-      opacity: 0.2;
-      line-height: 1;
-    }
+    .kb-alt-alpha { opacity: 0.8; }
+    .kb-alt-sym   { opacity: 0.68; }
 
-    #custom-keyboard.alt-mode .kb-alt  { color: var(--pico-color); font-weight: 700; }
+    #custom-keyboard.alt-mode .kb-alt  { color: var(--pico-color); font-weight: 700; opacity: 1; }
     #custom-keyboard.alt-mode .kb-primary { color: var(--pico-muted-color); font-weight: 400; }
 
     .kb-caps-mode {
@@ -393,13 +389,13 @@ const CustomKeyboard = {
         m('.kb-row', rowIndices.map(keyIdx => {
           const primary = T9_KEYS[keyIdx][0];
           const alt = T9_KEYS[keyIdx][1];
+          const altIsAlpha = /[a-z]/i.test(alt);
           return m('button.kb-key', {
             ...NOMOUSEDOWN,
             onclick: () => handleT9Key(keyIdx),
           }, [
             m('span.kb-primary', caps ? primary.toUpperCase() : primary),
-            m('span.kb-sep', '/'),
-            m('span.kb-alt', caps ? alt.toUpperCase() : alt),
+            m('span.kb-alt ' + (altIsAlpha ? '.kb-alt-alpha' : '.kb-alt-sym'), caps ? alt.toUpperCase() : alt),
           ]);
         }))
       ),
