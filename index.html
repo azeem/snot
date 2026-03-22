@@ -296,7 +296,7 @@
   <script>
     // IndexedDB setup
     const DB_NAME = 'snot';
-    const DB_VERSION = 5;
+    const DB_VERSION = 6;
     const STORE_NAME = 'notes';
     const CONFIG_STORE_NAME = 'config';
     const DICT_STORE = 'dictionary';
@@ -314,7 +314,7 @@
             d.createObjectStore(CONFIG_STORE_NAME, { keyPath: 'key' });
           if (!d.objectStoreNames.contains(DICT_STORE))
             d.createObjectStore(DICT_STORE, { keyPath: 'word' });
-          if (e.oldVersion < 5 && window._kbLoaded) {
+          if (e.oldVersion < 6 && window._kbLoaded) {
             const store = tx.objectStore(DICT_STORE);
             SEED_WORDS.trim().split(/\s+/).filter(Boolean).forEach(w => store.put({ word: w }));
           }

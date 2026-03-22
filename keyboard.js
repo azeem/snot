@@ -255,7 +255,26 @@ const _BASE = `the of and to a in is it you that he was for on are with as his t
   six seven eight nine ten hundred truly wholly fully nearly partly fairly quite rather too
   very just only simply me him her them us we you they it its our your their his my
   so because although unless therefore thus hence anyway actually really finally recently
-  today tomorrow yesterday morning afternoon evening tonight`.split(/\s+/).filter(Boolean);
+  today tomorrow yesterday morning afternoon evening tonight
+  myself yourself himself herself itself ourselves themselves
+  anything something everything nothing anyone someone everyone nobody
+  anywhere somewhere everywhere nowhere
+  whether neither nor either
+  second third fourth fifth sixth seventh eighth ninth tenth
+  another other each every several
+  exactly roughly approximately currently previously
+  completely entirely totally absolutely
+  immediately eventually suddenly gradually constantly frequently rarely
+  especially particularly specifically generally normally basically essentially primarily
+  despite whereas along across throughout against
+  almost always often enough both further
+  somehow anyway meanwhile otherwise regardless instead
+  kind of sort of a lot of a bit of
+  per via etc eg ie vs re
+  monday tuesday wednesday thursday friday saturday sunday
+  january february march april may june july august september october november december
+  am pm et pt utc gmt
+  ok cool wow nice wow yep nope sure fair`.split(/\s+/).filter(Boolean);
 
 // Irregular verb forms listed explicitly (base + all conjugations)
 const _IRREG = `
@@ -327,11 +346,38 @@ const _IRREG = `
   spread spreads spreading
   cost costs costing
   shoot shoots shot shooting
-  meet meets met meeting
-  run runs ran running
   wear wears wore worn wearing
   hide hides hid hidden hiding
   shake shakes shook shaken shaking
+  mean means meant meaning
+  understand understands understood understanding
+  deal deals dealt dealing
+  sleep sleeps slept sleeping
+  sweep sweeps swept sweeping
+  bend bends bent bending
+  lend lends lent lending
+  spend spends spent spending
+  steal steals stole stolen stealing
+  freeze freezes froze frozen freezing
+  bite bites bit bitten biting
+  ride rides rode ridden riding
+  strike strikes struck striking
+  swear swears swore sworn swearing
+  tear tears tore torn tearing
+  light lights lit lighting
+  fit fits fitting
+  quit quits quitting
+  split splits splitting
+  let lets letting
+  shut shuts shutting
+  arise arises arose arisen arising
+  overcome overcomes overcame overcoming
+  undergo undergoes underwent undergone undergoing
+  withdraw withdraws withdrew withdrawn withdrawing
+  mistake mistakes mistook mistaken mistaking
+  foresee foresees foresaw foreseen foreseeing
+  forbid forbids forbade forbidden forbidding
+  overcome overcomes overcame overcoming
 `.trim().split(/\s+/);
 
 // Regular verbs: _verbForms applied automatically (do not list irregular verbs here)
@@ -345,12 +391,47 @@ const _REG_VERBS = `
   enable protect track search filter sort group tag mark miss save load store collect
   process render display format submit cancel delete insert select export import request
   respond post comment mention notify remind count measure compare combine handle cover
-  prevent identify supply report cross fill carry close press move turn roll call pick
-  drop kick kick push pull flip grab hold touch press tap scroll click type open close
-  log debug test build release ship deploy restart reset refresh reload back forward
-  note list book order buy email call message text chat meet schedule cancel postpone
-  confirm deny block allow reject approve publish archive restore backup sync merge
-  split focus pause resume stop start toggle switch enable disable activate deactivate
+  prevent identify supply report cross fill carry press roll pick
+  drop flip grab touch tap scroll click type
+  log debug build release ship restart reset refresh reload
+  note list book order email message text chat postpone
+  deny reject publish archive restore backup sync merge
+  focus pause resume toggle switch activate deactivate
+  agree disagree argue discuss describe analyze propose recommend
+  prioritize organize coordinate collaborate communicate
+  present demonstrate validate clarify simplify optimize
+  integrate configure generate automate iterate
+  explore discover research practice reflect observe
+  sketch prototype achieve accomplish realize perform execute
+  succeed attempt approach address engage evaluate assess
+  prepare finalize enter exit express notice contribute
+  estimate forecast calculate benchmark
+  clarify describe define outline summarize explain
+  translate adapt extend limit adjust shift
+  negotiate contract partner transform evolve scale
+  reference link attach embed annotate highlight copy paste
+  register login logout authenticate authorize
+  alert escalate resolve investigate audit
+  hire promote retire recruit interview onboard
+  invoice quote estimate bill charge refund pay
+  record track measure monitor report log
+  plan draft finalize review approve release
+  design architect prototype test iterate deploy
+  style theme brand format layout render
+  encode decode parse validate sanitize serialize
+  cache queue buffer stream pipe
+  clone fork branch rebase stash commit push pull
+  zip compress extract convert export import
+  load save open close read write append
+  create rename delete move copy
+  search find filter sort group paginate
+  send receive forward reply redirect
+  trigger fire emit listen subscribe unsubscribe
+  start stop restart pause resume continue
+  lock unlock block unblock enable disable
+  show hide toggle expand collapse
+  add remove update patch replace merge
+  set get reset clear flush purge
 `.trim().split(/\s+/).filter(Boolean);
 
 // Regular nouns: _nounForms applied automatically
@@ -366,8 +447,36 @@ const _REG_NOUNS = `
   action handler callback promise variable constant parameter argument return output
   input command option flag setting config mode view model controller layout template
   block item list grid card panel tab menu bar sidebar footer header title label
-  deadline presentation client manager boss product update sprint ticket priority
+  deadline presentation manager boss product update sprint ticket priority
   milestone goal metric score rate count total sum average percent ratio amount
+  person friend colleague partner parent teacher doctor nurse engineer designer
+  developer director leader member owner employee worker staff customer
+  head hand eye ear nose mouth face arm leg foot body heart mind brain
+  skill experience knowledge memory attention focus effort energy
+  phone laptop computer screen keyboard mouse tablet desk chair bag box cable device
+  network connection port protocol address domain host server database cluster
+  food water coffee tea lunch dinner breakfast snack meal drink
+  home kitchen bedroom bathroom garden park hotel airport station office
+  thread conversation discussion memo summary feedback draft revision approval
+  process workflow pipeline budget cost price revenue expense profit loss
+  risk challenge opportunity benefit outcome impact difference progress status
+  situation context background reason purpose direction strategy approach
+  number letter symbol character space line break indent margin padding border
+  color font size weight style class theme icon image icon avatar
+  repo branch commit tag release build artifact pipeline environment variable
+  token secret credential permission role scope resource endpoint api key
+  ticket queue priority label milestone sprint board column swimlane
+  comment review approval rejection suggestion improvement refactor
+  time date period moment instant season quarter deadline schedule slot
+  draft final revision version iteration prototype demo proof concept
+  user story acceptance criteria definition requirement specification
+  test case scenario step expected actual result pass fail skip
+  backup snapshot restore migration rollback deployment rollout
+  alert notification alarm reminder event webhook trigger
+  chart graph table dashboard panel widget report metric
+  team lead senior junior intern contractor vendor partner stakeholder
+  account profile setting preference language timezone locale currency
+  order invoice receipt payment refund subscription plan trial
 `.trim().split(/\s+/).filter(Boolean);
 
 // Irregular noun forms listed explicitly
@@ -382,7 +491,26 @@ const _ADJS = `
   special wonderful terrible awful strange funny serious perfect quick smart late early
   open right wrong different same available complete active current recent local public
   private common main general basic standard normal regular extra total final direct
-  possible likely certain obvious useful helpful careful useful smart clear simple
+  possible likely certain obvious useful helpful careful smart
+  red blue green black white yellow orange purple pink gray brown
+  big little tiny huge enormous massive medium wide narrow thick thin flat round sharp
+  excellent poor decent moderate significant major minor critical urgent essential optional
+  tired excited nervous worried confident calm relaxed stressed anxious exhausted
+  kind patient creative innovative ambitious motivated dedicated professional skilled
+  digital virtual manual automatic remote secure reliable stable efficient scalable
+  blocked pending failed broken fixed enabled disabled
+  related connected independent shared unique original custom individual multiple duplicate
+  surprised confused interested familiar comfortable flexible appropriate consistent
+  accurate relevant precise vague concrete abstract explicit implicit formal informal
+  internal external global local specific generic plain fancy raw processed live cached
+  open closed locked broken frozen stuck active inactive pending done
+  technical operational strategic tactical financial legal medical social environmental
+  written verbal visual interactive responsive adaptive progressive
+  primary secondary optional mandatory core extended legacy deprecated
+  weekly monthly quarterly annual daily hourly instant scheduled
+  short-term long-term immediate ongoing future previous current next
+  senior junior mid lead principal staff principal contract full-time part-time
+  high-priority low-priority medium-priority time-sensitive critical urgent normal low
 `.trim().split(/\s+/).filter(Boolean);
 
 // Build deduplicated SEED_WORDS in frequency order
