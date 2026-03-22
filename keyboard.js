@@ -177,7 +177,7 @@ window._kbLoaded = true;
       letter-spacing: 0.02em;
     }
 
-    .kb-num-layer.active {
+    #custom-keyboard .kb-num-layer.active {
       background: var(--pico-primary-background);
       color: var(--pico-primary-inverse);
       border-color: var(--pico-primary-border);
@@ -203,7 +203,7 @@ window._kbLoaded = true;
       letter-spacing: 0.02em;
     }
 
-    .kb-alt-mode.active {
+    #custom-keyboard .kb-alt-mode.active {
       background: var(--pico-primary-background);
       color: var(--pico-primary-inverse);
       border-color: var(--pico-primary-border);
