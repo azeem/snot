@@ -210,6 +210,7 @@ function resetKbState() {
   state.kb_caps_seq = [];
   state.kb_caps_mode = false;
   state.kb_suggestions = [];
+  state.kb_input_offset = 0;
 }
 
 // Prevents focus leaving the input when tapping keyboard buttons.
@@ -258,7 +259,7 @@ function getRawWord() {
 }
 
 function commitWord(word) {
-  state.input += word + ' ';
+  state.input = state.input.slice(0, state.kb_input_offset) + word + ' ';
   resetKbState();
   m.redraw();
 }
@@ -284,12 +285,14 @@ function handleT9CapsMode() {
 }
 
 function handleT9Key(keyIdx) {
+  if (state.kb_sequence.length === 0) state.kb_input_offset = state.input.length;
   state.kb_sequence.push(keyIdx);
   state.kb_alt_seq.push(state.kb_alt_mode);
   state.kb_caps_seq.push(state.kb_caps_mode);
   state.kb_alt_mode = false;
   state.kb_caps_mode = false;
   updateT9Suggestions();
+  state.input = state.input.slice(0, state.kb_input_offset) + getRawWord();
   m.redraw();
 }
 
@@ -299,6 +302,7 @@ function handleT9Backspace() {
     state.kb_alt_seq.pop();
     state.kb_caps_seq.pop();
     updateT9Suggestions();
+    state.input = state.input.slice(0, state.kb_input_offset) + getRawWord();
   } else {
     state.input = state.input.slice(0, -1);
   }
@@ -307,7 +311,7 @@ function handleT9Backspace() {
 
 function handleT9Space() {
   if (state.kb_sequence.length > 0) {
-    state.input += getRawWord() + ' ';
+    state.input = state.input.slice(0, state.kb_input_offset) + getRawWord() + ' ';
     resetKbState();
   } else {
     state.input += ' ';
@@ -316,7 +320,8 @@ function handleT9Space() {
 }
 
 function handleT9Submit() {
-  if (state.kb_sequence.length > 0) state.input += getRawWord();
+  if (state.kb_sequence.length > 0)
+    state.input = state.input.slice(0, state.kb_input_offset) + getRawWord();
   resetKbState();
   state.kb_visible = false;
   handleSubmit();
