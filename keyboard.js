@@ -652,6 +652,7 @@ function getRawWord() {
 
 function commitWord(word) {
   const wordLen = state.kb_sequence.length;
+  if (state.kb_caps_seq[0]) word = word[0].toUpperCase() + word.slice(1);
   replaceInInput(word + ' ', state.kb_input_offset, state.kb_input_offset + wordLen);
   resetKbState();
   m.redraw();
@@ -681,7 +682,8 @@ function handleNumKey(keyIdx) {
   // Commit any pending T9 sequence before inserting a symbol
   if (state.kb_sequence.length > 0) {
     const wordLen = state.kb_sequence.length;
-    const word = state.kb_exact_count > 0 ? state.kb_suggestions[0] : getRawWord();
+    let word = state.kb_exact_count > 0 ? state.kb_suggestions[0] : getRawWord();
+    if (state.kb_caps_seq[0] && state.kb_exact_count > 0) word = word[0].toUpperCase() + word.slice(1);
     replaceInInput(word, state.kb_input_offset, state.kb_input_offset + wordLen);
     resetKbState();
   }
@@ -730,7 +732,8 @@ function handleT9Backspace() {
 
 function handleT9Space() {
   if (state.kb_sequence.length > 0) {
-    const word = state.kb_exact_count > 0 ? state.kb_suggestions[0] : getRawWord();
+    let word = state.kb_exact_count > 0 ? state.kb_suggestions[0] : getRawWord();
+    if (state.kb_caps_seq[0] && state.kb_exact_count > 0) word = word[0].toUpperCase() + word.slice(1);
     const wordLen = state.kb_sequence.length;
     replaceInInput(word + ' ', state.kb_input_offset, state.kb_input_offset + wordLen);
     resetKbState();
@@ -852,7 +855,8 @@ const CustomKeyboard = {
             if (state.kb_sequence.length > 0 && state.kb_exact_count === 0 && state.kb_suggestions.length > 0) {
               _spaceLpTimer = setTimeout(() => {
                 _spaceLpFired = true;
-                const word = state.kb_suggestions[0];
+                let word = state.kb_suggestions[0];
+                if (state.kb_caps_seq[0]) word = word[0].toUpperCase() + word.slice(1);
                 const wordLen = state.kb_sequence.length;
                 replaceInInput(word + ' ', state.kb_input_offset, state.kb_input_offset + wordLen);
                 resetKbState();
