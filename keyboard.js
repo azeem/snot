@@ -60,19 +60,6 @@ window._kbLoaded = true;
       color: var(--pico-primary);
     }
 
-    .kb-combo {
-      background: none;
-      border: 1px solid var(--pico-muted-border-color);
-      border-radius: 1rem;
-      padding: 0.2rem 0.65rem;
-      font-size: 0.9rem;
-      color: var(--pico-muted-color);
-      cursor: pointer;
-      width: auto;
-      margin: 0;
-      white-space: nowrap;
-    }
-
     .kb-add-word {
       background: none;
       border: 1px dashed var(--pico-muted-border-color);
@@ -232,7 +219,7 @@ const NOMOUSEDOWN = { onmousedown: e => e.preventDefault() };
 const KB_ROWS = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]];
 
 // ── Lookup ────────────────────────────────────────────────────────────────────
-function t9Lookup(sequence) {
+function t9Lookup(sequence, altSeq) {
   if (!sequence.length) return { exact: [], prefix: [] };
   const len = sequence.length;
   const exact = [], prefix = [];
@@ -240,7 +227,11 @@ function t9Lookup(sequence) {
     if (word.length < len) continue;
     let match = true;
     for (let i = 0; i < len; i++) {
-      if (CHAR_TO_KEY[word[i]] !== sequence[i]) { match = false; break; }
+      if (altSeq && altSeq[i]) {
+        if (word[i] !== T9_KEYS[sequence[i]][1]) { match = false; break; }
+      } else {
+        if (CHAR_TO_KEY[word[i]] !== sequence[i]) { match = false; break; }
+      }
     }
     if (!match) continue;
     if (word.length === len) exact.push(word);
@@ -253,7 +244,7 @@ function t9Lookup(sequence) {
 }
 
 function updateT9Suggestions() {
-  const { exact, prefix } = t9Lookup(state.kb_sequence);
+  const { exact, prefix } = t9Lookup(state.kb_sequence, state.kb_alt_seq);
   state.kb_suggestions = [...exact, ...prefix];
   state.kb_exact_count = exact.length;
 }
@@ -332,15 +323,6 @@ function handleT9Submit() {
   m.redraw();
 }
 
-function t9AllCombos(sequence) {
-  let results = [''];
-  for (const keyIdx of sequence) {
-    const [primary, alt] = T9_KEYS[keyIdx];
-    results = results.flatMap(s => [s + primary, s + alt]);
-  }
-  return results;
-}
-
 // ── Mithril component ─────────────────────────────────────────────────────────
 const CustomKeyboard = {
   view() {
@@ -350,7 +332,6 @@ const CustomKeyboard = {
     const suggestions = state.kb_suggestions;
     const exactCount = state.kb_exact_count || 0;
     const hasPending = sequence.length > 0;
-    const combos = hasPending && !suggestions.length ? t9AllCombos(sequence) : [];
     const kbClass = [state.kb_alt_mode ? 'alt-mode' : '', state.kb_caps_mode ? 'caps-mode' : ''].filter(Boolean).join(' ');
     const caps = state.kb_caps_mode;
     return m('#custom-keyboard', { class: kbClass }, [
@@ -369,12 +350,6 @@ const CustomKeyboard = {
             ...NOMOUSEDOWN,
             onclick: () => commitWord(word),
           }, word)
-        ),
-        ...combos.map(combo =>
-          m('button.kb-combo', {
-            ...NOMOUSEDOWN,
-            onclick: () => commitWord(combo),
-          }, combo)
         ),
         hasPending
           ? m('button.kb-add-word', {
