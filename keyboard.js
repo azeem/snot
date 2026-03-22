@@ -144,7 +144,7 @@ window._kbLoaded = true;
     .kb-alt-sym   { opacity: 0.25; }
 
     #custom-keyboard.alt-mode .kb-alt  { color: var(--pico-color); font-weight: 700; opacity: 1; }
-    #custom-keyboard.alt-mode .kb-primary { opacity: 0.25; font-weight: 400; }
+    #custom-keyboard.alt-mode .kb-primary { opacity: 0.25; }
 
     .kb-caps-mode {
       flex: 1;
