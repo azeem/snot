@@ -140,7 +140,8 @@ window._kbLoaded = true;
     }
 
     .kb-alt-alpha { opacity: 0.6; }
-    .kb-alt-sym   { opacity: 0.4; }
+    .kb-alt-num   { opacity: 0.25; }
+    .kb-alt-sym   { opacity: 0.25; }
 
     #custom-keyboard.alt-mode .kb-alt  { color: var(--pico-color); font-weight: 700; opacity: 1; }
     #custom-keyboard.alt-mode .kb-primary { color: var(--pico-muted-color); font-weight: 400; }
@@ -390,12 +391,14 @@ const CustomKeyboard = {
           const primary = T9_KEYS[keyIdx][0];
           const alt = T9_KEYS[keyIdx][1];
           const altIsAlpha = /[a-z]/i.test(alt);
+          const altIsNum = /[0-9]/.test(alt);
+          const altClass = altIsAlpha ? '.kb-alt-alpha' : altIsNum ? '.kb-alt-num' : '.kb-alt-sym';
           return m('button.kb-key', {
             ...NOMOUSEDOWN,
             onclick: () => handleT9Key(keyIdx),
           }, [
             m('span.kb-primary', caps ? primary.toUpperCase() : primary),
-            m('span.kb-alt ' + (altIsAlpha ? '.kb-alt-alpha' : '.kb-alt-sym'), caps ? alt.toUpperCase() : alt),
+            m('span.kb-alt ' + altClass, caps ? alt.toUpperCase() : alt),
           ]);
         }))
       ),
