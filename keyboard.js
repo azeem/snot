@@ -26,18 +26,34 @@ window._kbLoaded = true;
       user-select: none;
     }
 
+    #kb-suggestion-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.2rem 0.1rem 0.4rem;
+      min-height: 2rem;
+    }
+
     #kb-suggestions {
       display: flex;
       flex-wrap: nowrap;
       align-items: center;
       gap: 0.3rem;
-      padding: 0.2rem 0.1rem 0.4rem;
-      min-height: 2rem;
+      flex: 1;
+      min-width: 0;
       overflow-x: auto;
       scrollbar-width: none;
+      min-height: 2rem;
     }
 
     #kb-suggestions::-webkit-scrollbar { display: none; }
+
+    .kb-side-buttons {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      flex-shrink: 0;
+    }
 
     .kb-suggestion {
       background: var(--pico-primary-background);
@@ -70,12 +86,12 @@ window._kbLoaded = true;
       cursor: pointer;
       width: auto;
       margin: 0;
+      white-space: nowrap;
     }
 
     .kb-done {
       width: auto;
-      margin: 0 0 0 auto;
-      order: 999;
+      margin: 0;
       padding: 0.15rem 0.6rem;
       font-size: 0.75rem;
       flex-shrink: 0;
@@ -311,7 +327,8 @@ function handleT9Backspace() {
 
 function handleT9Space() {
   if (state.kb_sequence.length > 0) {
-    state.input = state.input.slice(0, state.kb_input_offset) + getRawWord() + ' ';
+    const word = state.kb_exact_count > 0 ? state.kb_suggestions[0] : getRawWord();
+    state.input = state.input.slice(0, state.kb_input_offset) + word + ' ';
     resetKbState();
   } else {
     state.input += ' ';
@@ -340,29 +357,33 @@ const CustomKeyboard = {
     const kbClass = [state.kb_alt_mode ? 'alt-mode' : '', state.kb_caps_mode ? 'caps-mode' : ''].filter(Boolean).join(' ');
     const caps = state.kb_caps_mode;
     return m('#custom-keyboard', { class: kbClass }, [
-      m('#kb-suggestions', [
-        m('button.secondary.kb-done', {
-          ...NOMOUSEDOWN,
-          onclick: () => {
-            state.kb_visible = false;
-            const inp = document.querySelector('#input-row input');
-            if (inp) inp.blur();
-            m.redraw();
-          },
-        }, 'done'),
-        ...suggestions.map((word, i) =>
-          m('button.kb-suggestion' + (i >= exactCount ? '.prefix' : ''), {
-            ...NOMOUSEDOWN,
-            onclick: () => commitWord(word),
-          }, word)
-        ),
-        hasPending
-          ? m('button.kb-add-word', {
+      m('#kb-suggestion-bar', [
+        m('#kb-suggestions',
+          suggestions.map((word, i) =>
+            m('button.kb-suggestion' + (i >= exactCount ? '.prefix' : ''), {
               ...NOMOUSEDOWN,
-              onclick: () => addWordToDictionary(rawPreview),
-              title: 'Add to dictionary',
-            }, '+ add "' + rawPreview + '"')
-          : null,
+              onclick: () => commitWord(word),
+            }, word)
+          )
+        ),
+        m('.kb-side-buttons', [
+          hasPending && exactCount === 0
+            ? m('button.kb-add-word', {
+                ...NOMOUSEDOWN,
+                onclick: () => addWordToDictionary(rawPreview),
+                title: 'Add to dictionary',
+              }, '+ dict')
+            : null,
+          m('button.secondary.kb-done', {
+            ...NOMOUSEDOWN,
+            onclick: () => {
+              state.kb_visible = false;
+              const inp = document.querySelector('#input-row input');
+              if (inp) inp.blur();
+              m.redraw();
+            },
+          }, 'done'),
+        ]),
       ]),
       ...KB_ROWS.map(rowIndices =>
         m('.kb-row', rowIndices.map(keyIdx => {
