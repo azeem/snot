@@ -139,8 +139,8 @@ window._kbLoaded = true;
       line-height: 1;
     }
 
-    .kb-alt-alpha { opacity: 0.8; }
-    .kb-alt-sym   { opacity: 0.68; }
+    .kb-alt-alpha { opacity: 0.6; }
+    .kb-alt-sym   { opacity: 0.4; }
 
     #custom-keyboard.alt-mode .kb-alt  { color: var(--pico-color); font-weight: 700; opacity: 1; }
     #custom-keyboard.alt-mode .kb-primary { color: var(--pico-muted-color); font-weight: 400; }
