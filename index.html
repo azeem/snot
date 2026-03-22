@@ -364,17 +364,13 @@
       margin: 0;
     }
 
-    .kb-dismiss {
-      background: none;
-      border: none;
-      padding: 0.1rem 0.4rem;
-      font-size: 1.1rem;
-      color: var(--pico-muted-color);
-      cursor: pointer;
+    .kb-done {
       width: auto;
-      margin: 0 0.1rem 0 auto;
+      margin: 0 0 0 auto;
       order: 999;
-      line-height: 1;
+      padding: 0.15rem 0.6rem;
+      font-size: 0.75rem;
+      flex-shrink: 0;
     }
 
     .kb-row {
@@ -415,12 +411,19 @@
     .kb-alt {
       font-size: 0.95rem;
       font-weight: 700;
-      color: #d4720a;
+      color: var(--pico-color);
+      line-height: 1;
+    }
+
+    .kb-sep {
+      font-size: 0.7rem;
+      font-weight: 300;
+      opacity: 0.2;
       line-height: 1;
     }
 
     #custom-keyboard.alt-mode .kb-alt {
-      color: #d4720a;
+      color: var(--pico-color);
       font-weight: 700;
     }
 
@@ -1235,7 +1238,7 @@
         const kbClass = [state.kb_alt_mode ? 'alt-mode' : '', state.kb_caps_mode ? 'caps-mode' : ''].filter(Boolean).join(' ');
         return m('#custom-keyboard', { class: kbClass }, [
           m('#kb-suggestions', [
-            m('button.kb-dismiss', {
+            m('button.secondary.kb-done', {
               onmousedown: e => e.preventDefault(),
               onclick: () => {
                 state.kb_visible = false;
@@ -1243,8 +1246,7 @@
                 if (inp) inp.blur();
                 m.redraw();
               },
-              title: 'Dismiss keyboard',
-            }, '\u2304'),
+            }, 'done'),
             ...suggestions.map((word, i) =>
               m('button.kb-suggestion' + (i >= exactCount ? '.prefix' : ''), {
                 onmousedown: e => e.preventDefault(),
@@ -1266,15 +1268,19 @@
               : null,
           ]),
           ...rows.map(rowIndices =>
-            m('.kb-row', rowIndices.map(keyIdx =>
-              m('button.kb-key', {
+            m('.kb-row', rowIndices.map(keyIdx => {
+              const caps = state.kb_caps_mode;
+              const primary = T9_KEYS[keyIdx][0];
+              const alt = T9_KEYS[keyIdx][1];
+              return m('button.kb-key', {
                 onmousedown: e => e.preventDefault(),
                 onclick: () => handleT9Key(keyIdx),
               }, [
-                m('span.kb-primary', T9_KEYS[keyIdx][0]),
-                m('span.kb-alt', T9_KEYS[keyIdx][1]),
-              ])
-            ))
+                m('span.kb-primary', caps ? primary.toUpperCase() : primary),
+                m('span.kb-sep', '/'),
+                m('span.kb-alt', caps ? alt.toUpperCase() : alt),
+              ]);
+            })))
           ),
           m('.kb-row.kb-utility-row', [
             m('button.kb-key.kb-backspace', {
