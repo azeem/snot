@@ -919,6 +919,11 @@
                   inputmode: 'none',
                   onfocus: () => { state.kb_visible = true; m.redraw(); },
                   onblur: () => { setTimeout(() => { state.kb_visible = false; m.redraw(); }, 150); },
+                  onupdate: vnode => {
+                    const el = vnode.dom;
+                    el.setSelectionRange(el.value.length, el.value.length);
+                    el.scrollLeft = el.scrollWidth;
+                  },
                 } : {}),
                 oninput: handleInput,
                 onkeydown: handleKeydown,
