@@ -423,6 +423,7 @@
       kb_suggestions: [],
       kb_exact_count: 0,
       kb_input_offset: 0,
+      kb_cursor_pos: undefined,
     };
 
     let _toastTimer = null;
@@ -921,7 +922,10 @@
                   onblur: () => { setTimeout(() => { state.kb_visible = false; m.redraw(); }, 150); },
                   onupdate: vnode => {
                     const el = vnode.dom;
-                    el.setSelectionRange(el.value.length, el.value.length);
+                    if (state.kb_cursor_pos !== undefined) {
+                      el.setSelectionRange(state.kb_cursor_pos, state.kb_cursor_pos);
+                      state.kb_cursor_pos = undefined;
+                    }
                     el.scrollLeft = el.scrollWidth;
                   },
                 } : {}),

@@ -213,6 +213,23 @@ const WORD_FREQ = {};
   words.forEach((w, i) => { WORD_FREQ[w] = words.length - i; });
 })();
 
+// ── DOM input helpers ─────────────────────────────────────────────────────────
+function getInputEl() {
+  return document.querySelector('#input-wrapper input');
+}
+
+// Replace [start, end) in the real input DOM element with `text`, then fire a
+// synthetic input event so Mithril's handleInput runs (updates state.input,
+// manages autocomplete, etc.).  We save the resulting cursor position so that
+// index.html's onupdate hook can restore it after Mithril re-renders.
+function replaceInInput(text, start, end) {
+  const el = getInputEl();
+  if (!el) return;
+  el.setRangeText(text, start, end, 'end');
+  state.kb_cursor_pos = el.selectionStart;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
 // ── Shared helpers ────────────────────────────────────────────────────────────
 // Resets all in-progress keyboard state. Called from both keyboard.js handlers
 // and index.html's handleSubmit / clear-button to avoid duplicating 6 assignments.
@@ -276,7 +293,8 @@ function getRawWord() {
 }
 
 function commitWord(word) {
-  state.input = state.input.slice(0, state.kb_input_offset) + word + ' ';
+  const wordLen = state.kb_sequence.length;
+  replaceInInput(word + ' ', state.kb_input_offset, state.kb_input_offset + wordLen);
   resetKbState();
   m.redraw();
 }
@@ -302,26 +320,31 @@ function handleT9CapsMode() {
 }
 
 function handleT9Key(keyIdx) {
-  if (state.kb_sequence.length === 0) state.kb_input_offset = state.input.length;
+  const el = getInputEl();
+  if (state.kb_sequence.length === 0) state.kb_input_offset = el ? el.selectionStart : state.input.length;
+  const prevLen = state.kb_sequence.length;
   state.kb_sequence.push(keyIdx);
   state.kb_alt_seq.push(state.kb_alt_mode);
   state.kb_caps_seq.push(state.kb_caps_mode);
   state.kb_alt_mode = false;
   state.kb_caps_mode = false;
   updateT9Suggestions();
-  state.input = state.input.slice(0, state.kb_input_offset) + getRawWord();
+  replaceInInput(getRawWord(), state.kb_input_offset, state.kb_input_offset + prevLen);
   m.redraw();
 }
 
 function handleT9Backspace() {
   if (state.kb_sequence.length > 0) {
+    const prevLen = state.kb_sequence.length;
     state.kb_sequence.pop();
     state.kb_alt_seq.pop();
     state.kb_caps_seq.pop();
     updateT9Suggestions();
-    state.input = state.input.slice(0, state.kb_input_offset) + getRawWord();
+    replaceInInput(getRawWord(), state.kb_input_offset, state.kb_input_offset + prevLen);
   } else {
-    state.input = state.input.slice(0, -1);
+    const el = getInputEl();
+    const pos = el ? el.selectionStart : state.input.length;
+    if (pos > 0) replaceInInput('', pos - 1, pos);
   }
   m.redraw();
 }
@@ -329,17 +352,22 @@ function handleT9Backspace() {
 function handleT9Space() {
   if (state.kb_sequence.length > 0) {
     const word = state.kb_exact_count > 0 ? state.kb_suggestions[0] : getRawWord();
-    state.input = state.input.slice(0, state.kb_input_offset) + word + ' ';
+    const wordLen = state.kb_sequence.length;
+    replaceInInput(word + ' ', state.kb_input_offset, state.kb_input_offset + wordLen);
     resetKbState();
   } else {
-    state.input += ' ';
+    const el = getInputEl();
+    const pos = el ? el.selectionStart : state.input.length;
+    replaceInInput(' ', pos, pos);
   }
   m.redraw();
 }
 
 function handleT9Submit() {
-  if (state.kb_sequence.length > 0)
-    state.input = state.input.slice(0, state.kb_input_offset) + getRawWord();
+  if (state.kb_sequence.length > 0) {
+    const wordLen = state.kb_sequence.length;
+    replaceInInput(getRawWord(), state.kb_input_offset, state.kb_input_offset + wordLen);
+  }
   resetKbState();
   state.kb_visible = false;
   handleSubmit();
@@ -426,7 +454,8 @@ const CustomKeyboard = {
               _spaceLpTimer = setTimeout(() => {
                 _spaceLpFired = true;
                 const word = state.kb_suggestions[0];
-                state.input = state.input.slice(0, state.kb_input_offset) + word + ' ';
+                const wordLen = state.kb_sequence.length;
+                replaceInInput(word + ' ', state.kb_input_offset, state.kb_input_offset + wordLen);
                 resetKbState();
                 m.redraw();
               }, 450);
