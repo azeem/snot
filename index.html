@@ -179,7 +179,12 @@
       border: 1px solid var(--pico-muted-border-color);
       border-radius: 0.5rem;
       overflow: hidden;
-      z-index: 100;
+      z-index: 1200;
+    }
+
+    #autocomplete.kb-open {
+      top: auto;
+      bottom: calc(100% + 4px);
     }
 
     .autocomplete-item {
@@ -929,7 +934,7 @@
                 onkeydown: handleKeydown,
               }),
               state.autocomplete && items.length
-                ? m('#autocomplete', items.map((cmd, i) =>
+                ? m('#autocomplete', { class: state.kb_visible ? 'kb-open' : '' }, items.map((cmd, i) =>
                     m('.autocomplete-item', {
                       class: i === state.autocomplete_index ? 'active' : '',
                       onmousedown: e => { e.preventDefault(); selectCommand(cmd); },
