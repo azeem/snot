@@ -202,9 +202,203 @@ const CHAR_TO_KEY = {};
 T9_KEYS.forEach((pair, idx) => { pair.forEach(ch => { CHAR_TO_KEY[ch] = idx; }); });
 
 // ── Dictionary seed + frequency table ────────────────────────────────────────
-// SEED_WORDS is kept as a global so the DB-seeding code in index.html can use it.
-// Words are roughly in English frequency order; earlier = more common.
-const SEED_WORDS = `the of and to a in is it you that he was for on are with as his they be at one have this from or had by not but what all were when we there can an your which their said if do will each how up out use word make him has look two more go see number no way could people my than first been its who now over know take where just well back come also into time write say much any part work new hand place made live after find day here down old found did same show again think great good help small away need keep got often next turn put end does move name long every never near far above always both even gave give left let own read real right run set should side soon start stop still those though three through told try until very while without yet young since before between ask men kind change went light off house animal point mother world build self earth father head stand page country answer school grow study learn plant cover food sun four state eye last thought city tree farm hard story sea draw late press close night life few north open together white children begin walk ease paper group music mark letter mile river car feet second enough plain girl ready ever list feel talk bird body dog family leave song door product short class wind question happen ship area half rock order fire problem piece pass top whole space heard hour better true hundred remember step early hold west ground interest reach fast table travel morning ten several toward war against pattern slow center love person money serve appear road map rain rule pull cold notice voice power town certain fly fall lead dark note wait figure star field rest correct able drive stood front teach week final green quick ocean warm free minute strong heavy matter friend floor clear deep full job done task item check follow review draft send call email meeting buy book plan schedule complete working waiting blocked maybe okay yes sorry thanks glad hope want like believe agree quite care usually sometimes tonight yesterday afternoon evening home office outside inside todo reply update fix add remove copy get test deploy push please hello bye later hmm month year tomorrow happy sad angry afraid clean dirty hot cool wet dry loud quiet easy rich poor sick healthy safe important simple nice perfect wonderful terrible awful strange funny serious busy wrong different wide flat round sharp dull bright soft speak sit lose pay meet include continue understand watch create spend win offer consider die expect raise sell require report decide suggest woman child company system government business issue service game among fact lot really already finally recently currently previously once twice perhaps five six seven eight nine ago some such most least less many other only came saw took knew tell become became felt bring brought began kept ran hear cut must shall would may might her them us me these our why whom whose nor so although because unless then rather too bad fine sure thing anyway actually basically literally honestly available today project deadline presentation client team manager boss paste delete undo redo save load probably definitely certainly possibly likely unlikely thank excuse hi hey goodbye`;
+// SEED_WORDS is generated at load time by combining typed base lists with
+// programmatic inflection (verb conjugations, noun plurals, adverbs).
+// Words appear in rough frequency order so earlier entries rank higher.
+
+function _isVowel(c) { return 'aeiou'.includes(c); }
+function _isCVC(w) {
+  const l = w.length;
+  // Consonant-Vowel-Consonant: don't double w/x/y/h
+  return l >= 3 && !_isVowel(w[l-1]) && !'wxyh'.includes(w[l-1]) &&
+         _isVowel(w[l-2]) && !_isVowel(w[l-3]);
+}
+// [3sg, -ing, -ed] for regular verbs
+function _verbForms(w) {
+  const l = w.length, last = w[l-1], last2 = w.slice(-2);
+  const s   = (last==='y' && !_isVowel(w[l-2])) ? w.slice(0,-1)+'ies'
+            : (last2==='sh'||last2==='ch'||'sxzo'.includes(last)) ? w+'es'
+            : w+'s';
+  const ing = (last==='e' && l>2 && last2!=='ee' && last2!=='ie') ? w.slice(0,-1)+'ing'
+            : _isCVC(w) ? w+last+'ing'
+            : w+'ing';
+  const ed  = last==='e' ? w+'d'
+            : (last==='y' && !_isVowel(w[l-2])) ? w.slice(0,-1)+'ied'
+            : _isCVC(w) ? w+last+'ed'
+            : w+'ed';
+  return [s, ing, ed];
+}
+// Plural(s) for regular nouns
+function _nounForms(w) {
+  const l = w.length, last = w[l-1], last2 = w.slice(-2);
+  if (last==='y' && !_isVowel(w[l-2])) return [w.slice(0,-1)+'ies'];
+  if (last2==='sh'||last2==='ch'||'sxz'.includes(last)) return [w+'es'];
+  return [w+'s'];
+}
+// -ly adverb for adjectives
+function _adjLy(w) {
+  const l = w.length;
+  if (w.slice(-2)==='le') return [w.slice(0,-1)+'y'];            // simple→simply
+  if (w[l-1]==='y' && !_isVowel(w[l-2])) return [w.slice(0,-1)+'ily']; // happy→happily
+  return [w+'ly'];
+}
+
+// Invariable base words in rough frequency order
+const _BASE = `the of and to a in is it you that he was for on are with as his they be at
+  one have this from or had by not but what all were when we there can an your which their
+  said if do will each how up out two more no could my than first been its who now over
+  where just well back also into much any those though three through until very while
+  without yet since before between both even own same soon still again always never often
+  sometimes usually already perhaps probably definitely certainly maybe okay yes no sorry
+  thanks glad please hello hi hey bye hmm about above below near far here there now then
+  once twice ago next last every some few many most least less all one two three four five
+  six seven eight nine ten hundred truly wholly fully nearly partly fairly quite rather too
+  very just only simply me him her them us we you they it its our your their his my
+  so because although unless therefore thus hence anyway actually really finally recently
+  today tomorrow yesterday morning afternoon evening tonight`.split(/\s+/).filter(Boolean);
+
+// Irregular verb forms listed explicitly (base + all conjugations)
+const _IRREG = `
+  be am is are was were been being
+  have has had having
+  do does did done doing
+  go goes went gone going
+  say says said saying
+  make makes made making
+  know knows knew known knowing
+  think thinks thought thinking
+  take takes took taken taking
+  see sees saw seen seeing
+  come comes came coming
+  get gets got gotten getting
+  give gives gave given giving
+  find finds found finding
+  tell tells told telling
+  become becomes became becoming
+  feel feels felt feeling
+  leave leaves left leaving
+  keep keeps kept keeping
+  begin begins began begun beginning
+  hear hears heard hearing
+  run runs ran running
+  sit sits sat sitting
+  stand stands stood standing
+  lose loses lost losing
+  meet meets met meeting
+  lead leads led leading
+  win wins won winning
+  fall falls fell fallen falling
+  cut cuts cutting
+  build builds built building
+  send sends sent sending
+  spend spends spent spending
+  grow grows grew grown growing
+  hold holds held holding
+  write writes wrote written writing
+  speak speaks spoke spoken speaking
+  buy buys bought buying
+  sell sells sold selling
+  read reads reading
+  show shows showed shown showing
+  put puts putting
+  let lets letting
+  set sets setting
+  bring brings brought bringing
+  catch catches caught catching
+  teach teaches taught teaching
+  draw draws drew drawn drawing
+  drive drives drove driven driving
+  break breaks broke broken breaking
+  choose chooses chose chosen choosing
+  fly flies flew flown flying
+  forget forgets forgot forgotten forgetting
+  fight fights fought fighting
+  pay pays paid paying
+  rise rises rose risen rising
+  throw throws threw thrown throwing
+  eat eats ate eaten eating
+  drink drinks drank drunk drinking
+  sing sings sang sung singing
+  swim swims swam swimming
+  wake wakes woke woken waking
+  hit hits hitting
+  hurt hurts hurting
+  shut shuts shutting
+  spread spreads spreading
+  cost costs costing
+  shoot shoots shot shooting
+  meet meets met meeting
+  run runs ran running
+  wear wears wore worn wearing
+  hide hides hid hidden hiding
+  shake shakes shook shaken shaking
+`.trim().split(/\s+/);
+
+// Regular verbs: _verbForms applied automatically (do not list irregular verbs here)
+const _REG_VERBS = `
+  work call use live move love care plan stop help need want wait walk talk ask play stay
+  try learn change follow check start finish watch push pull add remove test schedule look
+  open close reach serve appear offer consider remember join share update fix deploy reply
+  review draft complete block receive decide suggest happen allow create require include
+  provide accept expect explain manage return contain pass travel visit upload download
+  install launch assign approve confirm support improve increase decrease connect disable
+  enable protect track search filter sort group tag mark miss save load store collect
+  process render display format submit cancel delete insert select export import request
+  respond post comment mention notify remind count measure compare combine handle cover
+  prevent identify supply report cross fill carry close press move turn roll call pick
+  drop kick kick push pull flip grab hold touch press tap scroll click type open close
+  log debug test build release ship deploy restart reset refresh reload back forward
+  note list book order buy email call message text chat meet schedule cancel postpone
+  confirm deny block allow reject approve publish archive restore backup sync merge
+  split focus pause resume stop start toggle switch enable disable activate deactivate
+`.trim().split(/\s+/).filter(Boolean);
+
+// Regular nouns: _nounForms applied automatically
+const _REG_NOUNS = `
+  note task item meeting email report project plan team day week month year minute hour
+  file folder document message comment user page link button section part step version
+  issue bug feature test change word sentence paragraph chapter point idea question answer
+  problem solution result option way method rule case example instance name place city
+  town school road car door window room floor wall street book paper line form field
+  column row table release patch log error warning success failure server client request
+  response header body route endpoint function class module package library framework
+  component service database record entry key value type attribute property event
+  action handler callback promise variable constant parameter argument return output
+  input command option flag setting config mode view model controller layout template
+  block item list grid card panel tab menu bar sidebar footer header title label
+  deadline presentation client manager boss product update sprint ticket priority
+  milestone goal metric score rate count total sum average percent ratio amount
+`.trim().split(/\s+/).filter(Boolean);
+
+// Irregular noun forms listed explicitly
+const _IRREG_NOUNS = `person people man men woman women child children foot feet tooth teeth
+  mouse mice life lives leaf leaves knife knives wolf wolves half halves`.split(/\s+/);
+
+// Adjectives: _adjLy generates adverb form
+const _ADJS = `
+  happy sad angry glad clear clean easy hard fast slow warm cold hot wet dry loud quiet
+  free busy safe sick healthy ready sure true good great nice new old young small large
+  long short high low dark light bright soft strong heavy deep full real important simple
+  special wonderful terrible awful strange funny serious perfect quick smart late early
+  open right wrong different same available complete active current recent local public
+  private common main general basic standard normal regular extra total final direct
+  possible likely certain obvious useful helpful careful useful smart clear simple
+`.trim().split(/\s+/).filter(Boolean);
+
+// Build deduplicated SEED_WORDS in frequency order
+const SEED_WORDS = (() => {
+  const seen = new Set();
+  const all  = [];
+  const add  = w => { if (w && w.length > 0 && !seen.has(w)) { seen.add(w); all.push(w); } };
+  _BASE.forEach(add);
+  _IRREG.forEach(add);
+  _IRREG_NOUNS.forEach(add);
+  _REG_VERBS.forEach(w => { add(w); _verbForms(w).forEach(add); });
+  _REG_NOUNS.forEach(w => { add(w); _nounForms(w).forEach(add); });
+  _ADJS.forEach(w => { add(w); _adjLy(w).forEach(add); });
+  return all.join(' ');
+})();
+
 
 // Frequency scores: index 0 = "the" = highest. User-added words get 99999.
 const WORD_FREQ = {};
