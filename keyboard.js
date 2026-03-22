@@ -183,6 +183,12 @@ window._kbLoaded = true;
       border-color: var(--pico-primary-border);
     }
 
+    .kb-num-layer:disabled,
+    .kb-caps-mode:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
     .kb-space {
       flex: 1.5;
       font-size: 0.75rem;
@@ -820,6 +826,7 @@ const CustomKeyboard = {
       m('.kb-row.kb-utility-row', [
         m('button.kb-key.kb-num-layer', {
           class: numLayer ? 'active' : '',
+          disabled: caps,
           ...NOMOUSEDOWN,
           onclick: handleNumLayer,
           title: 'Switch to numbers / symbols layer',
@@ -832,6 +839,7 @@ const CustomKeyboard = {
         }, 'ALT'),
         m('button.kb-key.kb-caps-mode', {
           class: state.kb_caps_mode ? 'active' : '',
+          disabled: numLayer,
           ...NOMOUSEDOWN,
           onclick: handleT9CapsMode,
           title: 'Next key is uppercase',
