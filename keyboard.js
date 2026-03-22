@@ -213,6 +213,20 @@ const WORD_FREQ = {};
   words.forEach((w, i) => { WORD_FREQ[w] = words.length - i; });
 })();
 
+// ── Autocomplete sync ─────────────────────────────────────────────────────────
+function syncAutocomplete() {
+  const val = state.input;
+  const parts = val.split(' ');
+  const lastToken = parts[parts.length - 1];
+  const inArgMode = val.startsWith('/') && parts.length > 1 && lastToken.startsWith('/') && !lastToken.includes(':');
+  if ((val.startsWith('/') && val.indexOf(' ') === -1) || inArgMode) {
+    state.autocomplete = true;
+    state.autocomplete_index = 0;
+  } else {
+    state.autocomplete = false;
+  }
+}
+
 // ── Shared helpers ────────────────────────────────────────────────────────────
 // Resets all in-progress keyboard state. Called from both keyboard.js handlers
 // and index.html's handleSubmit / clear-button to avoid duplicating 6 assignments.
@@ -278,6 +292,7 @@ function getRawWord() {
 function commitWord(word) {
   state.input = state.input.slice(0, state.kb_input_offset) + word + ' ';
   resetKbState();
+  syncAutocomplete();
   m.redraw();
 }
 
@@ -310,6 +325,7 @@ function handleT9Key(keyIdx) {
   state.kb_caps_mode = false;
   updateT9Suggestions();
   state.input = state.input.slice(0, state.kb_input_offset) + getRawWord();
+  syncAutocomplete();
   m.redraw();
 }
 
@@ -323,6 +339,7 @@ function handleT9Backspace() {
   } else {
     state.input = state.input.slice(0, -1);
   }
+  syncAutocomplete();
   m.redraw();
 }
 
@@ -334,6 +351,7 @@ function handleT9Space() {
   } else {
     state.input += ' ';
   }
+  syncAutocomplete();
   m.redraw();
 }
 
