@@ -38,6 +38,7 @@ window._kbLoaded = true;
       display: flex;
       flex-wrap: nowrap;
       align-items: center;
+      justify-content: center;
       gap: 0.3rem;
       flex: 1;
       min-width: 0;
@@ -161,7 +162,26 @@ window._kbLoaded = true;
 
     .kb-utility-row { gap: 0.3rem; margin-bottom: 0; }
 
-    .kb-backspace { flex: 1; font-size: 1.1rem; }
+    .kb-backspace-bar {
+      width: auto;
+      margin: 0;
+      padding: 0.15rem 0.6rem;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .kb-num-layer {
+      flex: 1;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .kb-num-layer.active {
+      background: var(--pico-primary-background);
+      color: var(--pico-primary-inverse);
+      border-color: var(--pico-primary-border);
+    }
 
     .kb-space {
       flex: 1.5;
@@ -572,8 +592,19 @@ const NOMOUSEDOWN = { onmousedown: e => e.preventDefault() };
 let _spaceLpTimer = null;
 let _spaceLpFired = false;
 
-// Key index rows — constant, defined once outside view().
-const KB_ROWS = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]];
+// Key index rows — numbers row removed; now only 3 QWERTY rows (q-t, a-g, z-b).
+const KB_ROWS = [[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]];
+
+// Numbers / symbols layer — 3 rows × 5 keys.
+// Row 1: digits 1–5, alt = shift symbols  (!@#$%)
+// Row 2: digits 6–0, alt = shift symbols  (^&*())
+// Row 3: common punctuation, alt = secondary punctuation
+const NUM_LAYER_KEYS = [
+  ['1','!'], ['2','@'], ['3','#'], ['4','$'], ['5','%'],
+  ['6','^'], ['7','&'], ['8','*'], ['9','('], ['0',')'],
+  ['.', ':'], [',', ';'], ['-', '_'], ["'", '"'], ['?', '/'],
+];
+const NUM_KB_ROWS = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14]];
 
 // ── Lookup ────────────────────────────────────────────────────────────────────
 function t9Lookup(sequence, altSeq) {
@@ -633,6 +664,27 @@ function addWordToDictionary(word) {
 // ── Key handlers ──────────────────────────────────────────────────────────────
 function handleT9AltMode() {
   state.kb_alt_mode = !state.kb_alt_mode;
+  m.redraw();
+}
+
+function handleNumLayer() {
+  state.kb_num_layer = !state.kb_num_layer;
+  m.redraw();
+}
+
+function handleNumKey(keyIdx) {
+  // Commit any pending T9 sequence before inserting a symbol
+  if (state.kb_sequence.length > 0) {
+    const wordLen = state.kb_sequence.length;
+    const word = state.kb_exact_count > 0 ? state.kb_suggestions[0] : getRawWord();
+    replaceInInput(word, state.kb_input_offset, state.kb_input_offset + wordLen);
+    resetKbState();
+  }
+  const el = getInputEl();
+  const pos = el ? el.selectionStart : state.input.length;
+  const ch = NUM_LAYER_KEYS[keyIdx][state.kb_alt_mode ? 1 : 0];
+  replaceInInput(ch, pos, pos);
+  state.kb_alt_mode = false;
   m.redraw();
 }
 
@@ -707,6 +759,13 @@ const CustomKeyboard = {
     const hasPending = sequence.length > 0;
     const kbClass = [state.kb_alt_mode ? 'alt-mode' : '', state.kb_caps_mode ? 'caps-mode' : ''].filter(Boolean).join(' ');
     const caps = state.kb_caps_mode;
+    const numLayer = !!state.kb_num_layer;
+    const activeRows = numLayer ? NUM_KB_ROWS : KB_ROWS;
+    const activeKeys = numLayer ? NUM_LAYER_KEYS : T9_KEYS;
+    const onKeyPress = numLayer
+      ? (keyIdx) => handleNumKey(keyIdx)
+      : (keyIdx) => handleT9Key(keyIdx);
+
     return m('#custom-keyboard', { class: kbClass }, [
       m('#kb-suggestion-bar', [
         m('#kb-suggestions',
@@ -735,26 +794,36 @@ const CustomKeyboard = {
               m.redraw();
             },
           }, 'done'),
+          m('button.secondary.kb-backspace-bar', {
+            ...NOMOUSEDOWN,
+            onclick: handleT9Backspace,
+            title: 'Backspace',
+          }, '\u232B'),
         ]),
       ]),
-      ...KB_ROWS.map(rowIndices =>
+      ...activeRows.map(rowIndices =>
         m('.kb-row', rowIndices.map(keyIdx => {
-          const primary = T9_KEYS[keyIdx][0];
-          const alt = T9_KEYS[keyIdx][1];
+          const primary = activeKeys[keyIdx][0];
+          const alt = activeKeys[keyIdx][1];
           const altIsAlpha = /[a-z]/i.test(alt);
           const altIsNum = /[0-9]/.test(alt);
           const altClass = altIsAlpha ? '.kb-alt-alpha' : altIsNum ? '.kb-alt-num' : '.kb-alt-sym';
           return m('button.kb-key', {
             ...NOMOUSEDOWN,
-            onclick: () => handleT9Key(keyIdx),
+            onclick: () => onKeyPress(keyIdx),
           }, [
             m('span.kb-primary', caps ? primary.toUpperCase() : primary),
-            m('span.kb-alt ' + altClass, caps ? alt.toUpperCase() : alt),
+            m('span.kb-alt' + altClass, caps ? alt.toUpperCase() : alt),
           ]);
         }))
       ),
       m('.kb-row.kb-utility-row', [
-        m('button.kb-key.kb-backspace', { ...NOMOUSEDOWN, onclick: handleT9Backspace }, '\u232B'),
+        m('button.kb-key.kb-num-layer', {
+          class: numLayer ? 'active' : '',
+          ...NOMOUSEDOWN,
+          onclick: handleNumLayer,
+          title: 'Switch to numbers / symbols layer',
+        }, '123'),
         m('button.kb-key.kb-alt-mode', {
           class: state.kb_alt_mode ? 'active' : '',
           ...NOMOUSEDOWN,
