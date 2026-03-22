@@ -178,9 +178,9 @@ window._kbLoaded = true;
     }
 
     #custom-keyboard .kb-num-layer.active {
-      background: var(--pico-primary-background);
-      color: var(--pico-primary-inverse);
-      border-color: var(--pico-primary-border);
+      background: #b45a00;
+      color: #fff;
+      border-color: #b45a00;
     }
 
     .kb-num-layer:disabled,
@@ -204,9 +204,9 @@ window._kbLoaded = true;
     }
 
     #custom-keyboard .kb-alt-mode.active {
-      background: var(--pico-primary-background);
-      color: var(--pico-primary-inverse);
-      border-color: var(--pico-primary-border);
+      background: #b45a00;
+      color: #fff;
+      border-color: #b45a00;
     }
 
     .kb-submit { flex: 1; font-size: 1.1rem; }
