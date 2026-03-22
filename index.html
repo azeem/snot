@@ -333,6 +333,12 @@
       flex-shrink: 0;
     }
 
+    .kb-suggestion.prefix {
+      background: none;
+      border: 1px solid var(--pico-primary-border, var(--pico-primary));
+      color: var(--pico-primary);
+    }
+
     .kb-combo {
       background: none;
       border: 1px solid var(--pico-muted-border-color);
@@ -585,25 +591,43 @@
     const CHAR_TO_KEY = {};
     T9_KEYS.forEach((pair, idx) => { pair.forEach(ch => { CHAR_TO_KEY[ch] = idx; }); });
 
+    // Word frequency scores built from SEED_WORDS order (index 0 = most frequent).
+    // User-added words are assigned 99999 so they always sort first.
+    const WORD_FREQ = {};
+    (() => {
+      const words = `the of and to a in is it you that he was for on are with as his they be at one have this from or had by hot but some what there we can out other were all your when up use word how said an each she which do their time if will way about many then them write would like so these her long make thing see him two has look more day could go come did number sound no most people my over know water than call first who may down side been now find any new work part take get place made live where after back little only round man year came show every good me give our under name very through just form sentence great think say help low line differ turn cause much mean before move right boy old too same tell does set three want air well also play small end put home read hand port large spell add even land here must big high such follow act why ask men change went light kind off need house picture try us again animal point mother world near build self earth father head stand own page should country found answer school grow study still learn plant cover food sun four between state keep eye never last let thought city tree cross farm hard start might story saw far sea draw left late run while press close night real life few north open seem together next white children begin got walk example ease paper group always music those both mark often letter until mile river car feet care second enough plain girl usual young ready above ever red list though feel talk bird soon body dog family direct pose leave song measure door product black short numeral class wind question happen complete ship area half rock order fire south problem piece told knew pass since top whole king space heard best hour better true during hundred five remember step early hold west ground interest reach fast verb sing listen six table travel less morning ten simple several vowel toward war lay against pattern slow center love person money serve appear road map rain rule govern pull cold notice voice unit power town fine certain fly fall lead cry dark machine note wait plan figure star box noun field rest correct able pound done beauty drive stood contain front teach week final gave green oh quick develop ocean warm free minute strong special heavy diamond window sharp matter friend floor beautiful within often process clear deep full mark sure red small old even mean keep children feet side face wood between able seem head later become plan real felt hundred city trees run cut face base started follow love road soon last together next car below paper days white hundred soon group feet letter took science eat room friend began idea fish mountain stop once base hear horse cut sure watch color face wood main open seem half life always those both form sentence often letter enough plain young ready above ever list while main along watch those real light put end does large door hand move spell let back again animal then also two help between take every near add food keep children school start might story cross farm hard`.split(' ');
+      words.forEach((w, i) => { WORD_FREQ[w] = words.length - i; });
+    })();
+
     let dictWords = [];
 
     // ~1500 common English words for the initial dictionary seed
     const SEED_WORDS = `the of and to a in is it you that he was for on are with as his they be at one have this from or had by hot but some what there we can out other were all your when up use word how said an each she which do their time if will way about many then them write would like so these her long make thing see him two has look more day could go come did number sound no most people my over know water than call first who may down side been now find any new work part take get place made live where after back little only round man year came show every good me give our under name very through just form sentence great think say help low line differ turn cause much mean before move right boy old too same tell does set three want air well also play small end put home read hand port large spell add even land here must big high such follow act why ask men change went light kind off need house picture try us again animal point mother world near build self earth father head stand own page should country found answer school grow study still learn plant cover food sun four between state keep eye never last let thought city tree cross farm hard start might story saw far sea draw left late run while press close night real life few north open seem together next white children begin got walk example ease paper group always music those both mark often letter until mile river car feet care second enough plain girl usual young ready above ever red list though feel talk bird soon body dog family direct pose leave song measure door product black short numeral class wind question happen complete ship area half rock order fire south problem piece told knew pass since top whole king space heard best hour better true during hundred five remember step early hold west ground interest reach fast verb sing listen six table travel less morning ten simple several vowel toward war lay against pattern slow center love person money serve appear road map rain rule govern pull cold notice voice unit power town fine certain fly fall lead cry dark machine note wait plan figure star box noun field rest correct able pound done beauty drive stood contain front teach week final gave green oh quick develop ocean warm free minute strong special heavy diamond window sharp matter friend floor beautiful within often process clear deep full mark sure red small old even mean keep children feet side face wood between able seem head later become plan real felt hundred city trees run cut face base started follow love road soon last together next car below paper days white hundred soon group feet letter took science eat room friend began idea fish mountain stop once base hear horse cut sure watch color face wood main open seem half life always those both form sentence often letter enough plain young ready above ever list while main along watch those real light put end does large door hand move spell let back again animal then also two help between take every near add food keep children school start might story cross farm hard`;
 
     function t9Lookup(sequence) {
-      if (!sequence.length) return [];
+      if (!sequence.length) return { exact: [], prefix: [] };
       const len = sequence.length;
-      return dictWords.filter(word => {
-        if (word.length !== len) return false;
+      const exact = [], prefix = [];
+      for (const word of dictWords) {
+        if (word.length < len) continue;
+        let match = true;
         for (let i = 0; i < len; i++) {
-          if (CHAR_TO_KEY[word[i]] !== sequence[i]) return false;
+          if (CHAR_TO_KEY[word[i]] !== sequence[i]) { match = false; break; }
         }
-        return true;
-      });
+        if (!match) continue;
+        if (word.length === len) exact.push(word);
+        else prefix.push(word);
+      }
+      const byFreq = (a, b) => (WORD_FREQ[b] || 0) - (WORD_FREQ[a] || 0);
+      exact.sort(byFreq);
+      prefix.sort(byFreq);
+      return { exact, prefix };
     }
 
     function updateT9Suggestions() {
-      state.kb_suggestions = t9Lookup(state.kb_sequence);
+      const { exact, prefix } = t9Lookup(state.kb_sequence);
+      state.kb_suggestions = [...exact, ...prefix];
+      state.kb_exact_count = exact.length;
     }
 
     const state = {
@@ -623,6 +647,7 @@
       kb_caps_seq: [],
       kb_caps_mode: false,
       kb_suggestions: [],
+      kb_exact_count: 0,
     };
 
     let _toastTimer = null;
@@ -647,6 +672,7 @@
     function addWordToDictionary(word) {
       if (!word || dictWords.includes(word)) { commitWord(word); return; }
       dictWords.push(word);
+      WORD_FREQ[word] = 99999;
       if (db) dbDictPut(word);
       commitWord(word);
       showToast(`Added "${word}" to dictionary`);
@@ -1201,7 +1227,8 @@
         if (!state.kb_visible) return null;
         const sequence = state.kb_sequence;
         const rawPreview = getRawWord();
-        const suggestions = state.kb_suggestions.slice().sort();
+        const suggestions = state.kb_suggestions;
+        const exactCount = state.kb_exact_count || 0;
         const hasPending = sequence.length > 0;
         const rows = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]];
         const combos = hasPending && !suggestions.length ? t9AllCombos(sequence) : [];
@@ -1218,8 +1245,8 @@
               },
               title: 'Dismiss keyboard',
             }, '\u2304'),
-            ...suggestions.map(word =>
-              m('button.kb-suggestion', {
+            ...suggestions.map((word, i) =>
+              m('button.kb-suggestion' + (i >= exactCount ? '.prefix' : ''), {
                 onmousedown: e => e.preventDefault(),
                 onclick: () => commitWord(word),
               }, word)
