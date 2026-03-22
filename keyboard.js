@@ -38,7 +38,6 @@ window._kbLoaded = true;
       display: flex;
       flex-wrap: nowrap;
       align-items: center;
-      justify-content: center;
       gap: 0.3rem;
       flex: 1;
       min-width: 0;
@@ -94,7 +93,7 @@ window._kbLoaded = true;
       width: auto;
       margin: 0;
       padding: 0.15rem 0.6rem;
-      font-size: 0.75rem;
+      font-size: 1rem;
       flex-shrink: 0;
     }
 
@@ -799,7 +798,7 @@ const CustomKeyboard = {
               if (inp) inp.blur();
               m.redraw();
             },
-          }, 'done'),
+          }, '\u2713'),
           m('button.secondary.kb-backspace-bar', {
             ...NOMOUSEDOWN,
             onclick: handleT9Backspace,
