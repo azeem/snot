@@ -6,6 +6,7 @@
   <title>snot</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <script src="https://cdn.jsdelivr.net/npm/mithril@2/mithril.min.js"></script>
+  <script src="keyboard.js"></script>
   <style>
     body {
       max-width: 720px;
@@ -287,204 +288,15 @@
       --pill-bg: #1a7f37;
       --pill-color: #fff;
     }
-
-    /* Custom T9 Keyboard */
-    #custom-keyboard {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      max-width: 720px;
-      margin: 0 auto;
-      background: var(--pico-card-sectioning-background-color, #f4f4f4);
-      border-top: 1px solid var(--pico-muted-border-color);
-      padding: 0.4rem 0.35rem 0.5rem;
-      z-index: 1100;
-      user-select: none;
-    }
-
-    #kb-suggestions {
-      display: flex;
-      flex-wrap: nowrap;
-      align-items: center;
-      gap: 0.3rem;
-      padding: 0.2rem 0.1rem 0.4rem;
-      min-height: 2rem;
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-
-    #kb-suggestions::-webkit-scrollbar {
-      display: none;
-    }
-
-    .kb-suggestion {
-      background: var(--pico-primary-background);
-      color: var(--pico-primary-inverse);
-      border: none;
-      border-radius: 1rem;
-      padding: 0.2rem 0.75rem;
-      font-size: 0.9rem;
-      cursor: pointer;
-      line-height: 1.4;
-      width: auto;
-      margin: 0;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .kb-suggestion.prefix {
-      background: none;
-      border: 1px solid var(--pico-primary-border, var(--pico-primary));
-      color: var(--pico-primary);
-    }
-
-    .kb-combo {
-      background: none;
-      border: 1px solid var(--pico-muted-border-color);
-      border-radius: 1rem;
-      padding: 0.2rem 0.65rem;
-      font-size: 0.9rem;
-      color: var(--pico-muted-color);
-      cursor: pointer;
-      width: auto;
-      margin: 0;
-      white-space: nowrap;
-    }
-
-    .kb-add-word {
-      background: none;
-      border: 1px dashed var(--pico-muted-border-color);
-      border-radius: 1rem;
-      padding: 0.2rem 0.65rem;
-      font-size: 0.8rem;
-      color: var(--pico-muted-color);
-      cursor: pointer;
-      width: auto;
-      margin: 0;
-    }
-
-    .kb-done {
-      width: auto;
-      margin: 0 0 0 auto;
-      order: 999;
-      padding: 0.15rem 0.6rem;
-      font-size: 0.75rem;
-      flex-shrink: 0;
-    }
-
-    .kb-row {
-      display: flex;
-      gap: 0.3rem;
-      margin-bottom: 0.3rem;
-    }
-
-    .kb-key {
-      flex: 1;
-      background: var(--pico-background-color, #fff);
-      border: 1px solid var(--pico-muted-border-color);
-      border-radius: 0.35rem;
-      padding: 0.5rem 0.15rem;
-      cursor: pointer;
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      justify-content: center;
-      gap: 0.45rem;
-      min-height: 2.8rem;
-      width: auto;
-      margin: 0;
-      color: var(--pico-color);
-    }
-
-    .kb-key:active {
-      background: var(--pico-card-sectioning-background-color, #e8e8e8);
-    }
-
-    .kb-primary {
-      font-size: 0.95rem;
-      font-weight: 700;
-      line-height: 1;
-      color: var(--pico-color);
-    }
-
-    .kb-alt {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: var(--pico-color);
-      line-height: 1;
-    }
-
-    .kb-sep {
-      font-size: 0.7rem;
-      font-weight: 300;
-      opacity: 0.2;
-      line-height: 1;
-    }
-
-    #custom-keyboard.alt-mode .kb-alt {
-      color: var(--pico-color);
-      font-weight: 700;
-    }
-
-    #custom-keyboard.alt-mode .kb-primary {
-      color: var(--pico-muted-color);
-      font-weight: 400;
-    }
-
-    .kb-caps-mode {
-      flex: 1;
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-    }
-
-    .kb-caps-mode.active {
-      background: #b45a00;
-      color: #fff;
-      border-color: #b45a00;
-    }
-
-    .kb-utility-row {
-      gap: 0.3rem;
-      margin-bottom: 0;
-    }
-
-    .kb-backspace {
-      flex: 1;
-      font-size: 1.1rem;
-    }
-
-    .kb-space {
-      flex: 1.5;
-      font-size: 0.75rem;
-      font-weight: 400;
-      letter-spacing: 0.05em;
-    }
-
-    .kb-alt-mode {
-      flex: 1;
-      font-size: 0.8rem;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-    }
-
-    .kb-alt-mode.active {
-      background: var(--pico-primary-background);
-      color: var(--pico-primary-inverse);
-      border-color: var(--pico-primary-border);
-    }
-
-    .kb-submit {
-      flex: 1;
-      font-size: 1.1rem;
-    }
   </style>
 </head>
 <body>
   <div id="app"></div>
 
   <script>
+    // Set to false to disable the custom keyboard and use the OS keyboard instead.
+    const CUSTOM_KEYBOARD = true;
+
     // IndexedDB setup
     const DB_NAME = 'snot';
     const DB_VERSION = 4;
@@ -583,55 +395,7 @@
     const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL', 'new-state': 'INBOX', 'active-state': 'TODO', 'success-state': 'DONE' };
     const userConfig = {};
 
-    // T9 keyboard: key map. Each entry: [primaryChar, altChar]. 5 rows of 4 keys + utility row.
-    const T9_KEYS = [
-      ['1','0'], ['2','9'], ['3','8'], ['4','7'], ['5','6'],
-      ['q','p'], ['w','o'], ['e','i'], ['r','u'], ['t','y'],
-      ['a',';'], ['s','l'], ['d','k'], ['f','j'], ['g','h'],
-      ['z','/'], ['x','.'], ['c',','], ['v','m'], ['b','n'],
-    ];
-
-    const CHAR_TO_KEY = {};
-    T9_KEYS.forEach((pair, idx) => { pair.forEach(ch => { CHAR_TO_KEY[ch] = idx; }); });
-
-    // Word frequency scores built from SEED_WORDS order (index 0 = most frequent).
-    // User-added words are assigned 99999 so they always sort first.
-    const WORD_FREQ = {};
-    (() => {
-      const words = `the of and to a in is it you that he was for on are with as his they be at one have this from or had by hot but some what there we can out other were all your when up use word how said an each she which do their time if will way about many then them write would like so these her long make thing see him two has look more day could go come did number sound no most people my over know water than call first who may down side been now find any new work part take get place made live where after back little only round man year came show every good me give our under name very through just form sentence great think say help low line differ turn cause much mean before move right boy old too same tell does set three want air well also play small end put home read hand port large spell add even land here must big high such follow act why ask men change went light kind off need house picture try us again animal point mother world near build self earth father head stand own page should country found answer school grow study still learn plant cover food sun four between state keep eye never last let thought city tree cross farm hard start might story saw far sea draw left late run while press close night real life few north open seem together next white children begin got walk example ease paper group always music those both mark often letter until mile river car feet care second enough plain girl usual young ready above ever red list though feel talk bird soon body dog family direct pose leave song measure door product black short numeral class wind question happen complete ship area half rock order fire south problem piece told knew pass since top whole king space heard best hour better true during hundred five remember step early hold west ground interest reach fast verb sing listen six table travel less morning ten simple several vowel toward war lay against pattern slow center love person money serve appear road map rain rule govern pull cold notice voice unit power town fine certain fly fall lead cry dark machine note wait plan figure star box noun field rest correct able pound done beauty drive stood contain front teach week final gave green oh quick develop ocean warm free minute strong special heavy diamond window sharp matter friend floor beautiful within often process clear deep full mark sure red small old even mean keep children feet side face wood between able seem head later become plan real felt hundred city trees run cut face base started follow love road soon last together next car below paper days white hundred soon group feet letter took science eat room friend began idea fish mountain stop once base hear horse cut sure watch color face wood main open seem half life always those both form sentence often letter enough plain young ready above ever list while main along watch those real light put end does large door hand move spell let back again animal then also two help between take every near add food keep children school start might story cross farm hard`.split(' ');
-      words.forEach((w, i) => { WORD_FREQ[w] = words.length - i; });
-    })();
-
     let dictWords = [];
-
-    // ~1500 common English words for the initial dictionary seed
-    const SEED_WORDS = `the of and to a in is it you that he was for on are with as his they be at one have this from or had by hot but some what there we can out other were all your when up use word how said an each she which do their time if will way about many then them write would like so these her long make thing see him two has look more day could go come did number sound no most people my over know water than call first who may down side been now find any new work part take get place made live where after back little only round man year came show every good me give our under name very through just form sentence great think say help low line differ turn cause much mean before move right boy old too same tell does set three want air well also play small end put home read hand port large spell add even land here must big high such follow act why ask men change went light kind off need house picture try us again animal point mother world near build self earth father head stand own page should country found answer school grow study still learn plant cover food sun four between state keep eye never last let thought city tree cross farm hard start might story saw far sea draw left late run while press close night real life few north open seem together next white children begin got walk example ease paper group always music those both mark often letter until mile river car feet care second enough plain girl usual young ready above ever red list though feel talk bird soon body dog family direct pose leave song measure door product black short numeral class wind question happen complete ship area half rock order fire south problem piece told knew pass since top whole king space heard best hour better true during hundred five remember step early hold west ground interest reach fast verb sing listen six table travel less morning ten simple several vowel toward war lay against pattern slow center love person money serve appear road map rain rule govern pull cold notice voice unit power town fine certain fly fall lead cry dark machine note wait plan figure star box noun field rest correct able pound done beauty drive stood contain front teach week final gave green oh quick develop ocean warm free minute strong special heavy diamond window sharp matter friend floor beautiful within often process clear deep full mark sure red small old even mean keep children feet side face wood between able seem head later become plan real felt hundred city trees run cut face base started follow love road soon last together next car below paper days white hundred soon group feet letter took science eat room friend began idea fish mountain stop once base hear horse cut sure watch color face wood main open seem half life always those both form sentence often letter enough plain young ready above ever list while main along watch those real light put end does large door hand move spell let back again animal then also two help between take every near add food keep children school start might story cross farm hard`;
-
-    function t9Lookup(sequence) {
-      if (!sequence.length) return { exact: [], prefix: [] };
-      const len = sequence.length;
-      const exact = [], prefix = [];
-      for (const word of dictWords) {
-        if (word.length < len) continue;
-        let match = true;
-        for (let i = 0; i < len; i++) {
-          if (CHAR_TO_KEY[word[i]] !== sequence[i]) { match = false; break; }
-        }
-        if (!match) continue;
-        if (word.length === len) exact.push(word);
-        else prefix.push(word);
-      }
-      const byFreq = (a, b) => (WORD_FREQ[b] || 0) - (WORD_FREQ[a] || 0);
-      exact.sort(byFreq);
-      prefix.sort(byFreq);
-      return { exact, prefix };
-    }
-
-    function updateT9Suggestions() {
-      const { exact, prefix } = t9Lookup(state.kb_sequence);
-      state.kb_suggestions = [...exact, ...prefix];
-      state.kb_exact_count = exact.length;
-    }
 
     const state = {
       pairs: [],
@@ -658,95 +422,6 @@
       state.toast = msg;
       clearTimeout(_toastTimer);
       _toastTimer = setTimeout(() => { state.toast = null; m.redraw(); }, 3000);
-      m.redraw();
-    }
-
-    function commitWord(word) {
-      state.input += word + ' ';
-      state.kb_sequence = [];
-      state.kb_alt_seq = [];
-      state.kb_alt_mode = false;
-      state.kb_caps_seq = [];
-      state.kb_caps_mode = false;
-      state.kb_suggestions = [];
-      m.redraw();
-    }
-
-    function addWordToDictionary(word) {
-      if (!word || dictWords.includes(word)) { commitWord(word); return; }
-      dictWords.push(word);
-      WORD_FREQ[word] = 99999;
-      if (db) dbDictPut(word);
-      commitWord(word);
-      showToast(`Added "${word}" to dictionary`);
-    }
-
-    function getRawWord() {
-      return state.kb_sequence.map((i, pos) => {
-        const ch = T9_KEYS[i][state.kb_alt_seq[pos] ? 1 : 0];
-        return state.kb_caps_seq[pos] ? ch.toUpperCase() : ch;
-      }).join('');
-    }
-
-    function handleT9AltMode() {
-      state.kb_alt_mode = !state.kb_alt_mode;
-      m.redraw();
-    }
-
-    function handleT9CapsMode() {
-      state.kb_caps_mode = !state.kb_caps_mode;
-      m.redraw();
-    }
-
-    function handleT9Key(keyIdx) {
-      state.kb_sequence.push(keyIdx);
-      state.kb_alt_seq.push(state.kb_alt_mode);
-      state.kb_caps_seq.push(state.kb_caps_mode);
-      state.kb_alt_mode = false;
-      state.kb_caps_mode = false;
-      updateT9Suggestions();
-      m.redraw();
-    }
-
-    function handleT9Backspace() {
-      if (state.kb_sequence.length > 0) {
-        state.kb_sequence.pop();
-        state.kb_alt_seq.pop();
-        state.kb_caps_seq.pop();
-        updateT9Suggestions();
-      } else {
-        state.input = state.input.slice(0, -1);
-      }
-      m.redraw();
-    }
-
-    function handleT9Space() {
-      if (state.kb_sequence.length > 0) {
-        state.input += getRawWord() + ' ';
-        state.kb_sequence = [];
-        state.kb_alt_seq = [];
-        state.kb_alt_mode = false;
-        state.kb_caps_seq = [];
-        state.kb_caps_mode = false;
-        state.kb_suggestions = [];
-      } else {
-        state.input += ' ';
-      }
-      m.redraw();
-    }
-
-    function handleT9Submit() {
-      if (state.kb_sequence.length > 0) {
-        state.input += getRawWord();
-        state.kb_sequence = [];
-        state.kb_alt_seq = [];
-        state.kb_alt_mode = false;
-        state.kb_caps_seq = [];
-        state.kb_caps_mode = false;
-        state.kb_suggestions = [];
-      }
-      state.kb_visible = false;
-      handleSubmit();
       m.redraw();
     }
 
@@ -1145,15 +820,9 @@
     }
 
     function handleSubmit() {
-      // Commit any pending T9 sequence before submitting
       if (state.kb_sequence.length > 0) {
         state.input = (state.input + getRawWord()).trim();
-        state.kb_sequence = [];
-        state.kb_alt_seq = [];
-        state.kb_alt_mode = false;
-        state.kb_caps_seq = [];
-        state.kb_caps_mode = false;
-        state.kb_suggestions = [];
+        resetKbState();
       }
       const input = state.input.trim().replace(/[\u201C\u201D]/g, '"');
       if (!input) return;
@@ -1162,12 +831,7 @@
       dismissAutocomplete();
       state.show_welcome = false;
       state.input = '';
-      state.kb_sequence = [];
-      state.kb_alt_seq = [];
-      state.kb_alt_mode = false;
-      state.kb_caps_seq = [];
-      state.kb_caps_mode = false;
-      state.kb_suggestions = [];
+      resetKbState();
       state.kb_visible = false;
       state.collapsing = null;
 
@@ -1216,101 +880,7 @@
       }
     }
 
-    function t9AllCombos(sequence) {
-      let results = [''];
-      for (const keyIdx of sequence) {
-        const [primary, alt] = T9_KEYS[keyIdx];
-        results = results.flatMap(s => [s + primary, s + alt]);
-      }
-      return results;
-    }
-
-    const CustomKeyboard = {
-      view() {
-        if (!state.kb_visible) return null;
-        const sequence = state.kb_sequence;
-        const rawPreview = getRawWord();
-        const suggestions = state.kb_suggestions;
-        const exactCount = state.kb_exact_count || 0;
-        const hasPending = sequence.length > 0;
-        const rows = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]];
-        const combos = hasPending && !suggestions.length ? t9AllCombos(sequence) : [];
-        const kbClass = [state.kb_alt_mode ? 'alt-mode' : '', state.kb_caps_mode ? 'caps-mode' : ''].filter(Boolean).join(' ');
-        return m('#custom-keyboard', { class: kbClass }, [
-          m('#kb-suggestions', [
-            m('button.secondary.kb-done', {
-              onmousedown: e => e.preventDefault(),
-              onclick: () => {
-                state.kb_visible = false;
-                const inp = document.querySelector('#input-row input');
-                if (inp) inp.blur();
-                m.redraw();
-              },
-            }, 'done'),
-            ...suggestions.map((word, i) =>
-              m('button.kb-suggestion' + (i >= exactCount ? '.prefix' : ''), {
-                onmousedown: e => e.preventDefault(),
-                onclick: () => commitWord(word),
-              }, word)
-            ),
-            ...combos.map(combo =>
-              m('button.kb-combo', {
-                onmousedown: e => e.preventDefault(),
-                onclick: () => commitWord(combo),
-              }, combo)
-            ),
-            hasPending
-              ? m('button.kb-add-word', {
-                  onmousedown: e => e.preventDefault(),
-                  onclick: () => addWordToDictionary(rawPreview),
-                  title: 'Add to dictionary',
-                }, '+ add "' + rawPreview + '"')
-              : null,
-          ]),
-          ...rows.map(rowIndices =>
-            m('.kb-row', rowIndices.map(keyIdx => {
-              const caps = state.kb_caps_mode;
-              const primary = T9_KEYS[keyIdx][0];
-              const alt = T9_KEYS[keyIdx][1];
-              return m('button.kb-key', {
-                onmousedown: e => e.preventDefault(),
-                onclick: () => handleT9Key(keyIdx),
-              }, [
-                m('span.kb-primary', caps ? primary.toUpperCase() : primary),
-                m('span.kb-sep', '/'),
-                m('span.kb-alt', caps ? alt.toUpperCase() : alt),
-              ]);
-            }))
-          ),
-          m('.kb-row.kb-utility-row', [
-            m('button.kb-key.kb-backspace', {
-              onmousedown: e => e.preventDefault(),
-              onclick: handleT9Backspace,
-            }, '\u232B'),
-            m('button.kb-key.kb-alt-mode', {
-              class: state.kb_alt_mode ? 'active' : '',
-              onmousedown: e => e.preventDefault(),
-              onclick: handleT9AltMode,
-              title: 'Next key uses alternate character',
-            }, 'ALT'),
-            m('button.kb-key.kb-caps-mode', {
-              class: state.kb_caps_mode ? 'active' : '',
-              onmousedown: e => e.preventDefault(),
-              onclick: handleT9CapsMode,
-              title: 'Next key is uppercase',
-            }, '\u21E7'),
-            m('button.kb-key.kb-space', {
-              onmousedown: e => e.preventDefault(),
-              onclick: handleT9Space,
-            }, 'SPACE'),
-            m('button.kb-key.kb-submit', {
-              onmousedown: e => e.preventDefault(),
-              onclick: handleT9Submit,
-            }, '\u23CE'),
-          ]),
-        ]);
-      }
-    };
+    // CustomKeyboard component and all T9 helpers are defined in keyboard.js.
 
     const App = {
       oncreate() {
@@ -1323,18 +893,20 @@
         const menu = state.note_menu;
         const menuNote = menu && state.notes.find(n => n.id === menu.noteId);
         return m('main', [
-          m(CustomKeyboard),
+          CUSTOM_KEYBOARD ? m(CustomKeyboard) : null,
           m('#input-row', [
             m('#input-wrapper', [
               m('input', {
                 type: 'text',
                 placeholder: 'Type a note or /command...',
                 value: state.input,
-                inputmode: 'none',
+                ...(CUSTOM_KEYBOARD ? {
+                  inputmode: 'none',
+                  onfocus: () => { state.kb_visible = true; m.redraw(); },
+                  onblur: () => { setTimeout(() => { state.kb_visible = false; m.redraw(); }, 150); },
+                } : {}),
                 oninput: handleInput,
                 onkeydown: handleKeydown,
-                onfocus: () => { state.kb_visible = true; m.redraw(); },
-                onblur: () => { setTimeout(() => { state.kb_visible = false; m.redraw(); }, 150); },
               }),
               state.autocomplete && items.length
                 ? m('#autocomplete', items.map((cmd, i) =>
@@ -1349,12 +921,7 @@
               onmousedown: e => e.preventDefault(),
               onclick: () => {
                 state.input = '';
-                state.kb_sequence = [];
-                state.kb_alt_seq = [];
-                state.kb_alt_mode = false;
-                state.kb_caps_seq = [];
-                state.kb_caps_mode = false;
-                state.kb_suggestions = [];
+                resetKbState();
                 state.collapsing = null;
                 dismissAutocomplete();
                 document.querySelector('#input-row input').focus();
