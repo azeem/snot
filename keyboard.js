@@ -232,6 +232,10 @@ function resetKbState() {
 // Prevents focus leaving the input when tapping keyboard buttons.
 const NOMOUSEDOWN = { onmousedown: e => e.preventDefault() };
 
+// Long-press state for the space key.
+let _spaceLpTimer = null;
+let _spaceLpFired = false;
+
 // Key index rows — constant, defined once outside view().
 const KB_ROWS = [[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19]];
 
@@ -413,7 +417,26 @@ const CustomKeyboard = {
           onclick: handleT9CapsMode,
           title: 'Next key is uppercase',
         }, '\u21E7'),
-        m('button.kb-key.kb-space', { ...NOMOUSEDOWN, onclick: handleT9Space }, 'SPACE'),
+        m('button.kb-key.kb-space', {
+          onmousedown: e => e.preventDefault(),
+          onpointerdown: e => {
+            e.preventDefault();
+            _spaceLpFired = false;
+            // Long-press only fires when there are prefix suggestions but no exact match
+            if (state.kb_sequence.length > 0 && state.kb_exact_count === 0 && state.kb_suggestions.length > 0) {
+              _spaceLpTimer = setTimeout(() => {
+                _spaceLpFired = true;
+                const word = state.kb_suggestions[0];
+                state.input = state.input.slice(0, state.kb_input_offset) + word + ' ';
+                resetKbState();
+                m.redraw();
+              }, 450);
+            }
+          },
+          onpointerup:     () => clearTimeout(_spaceLpTimer),
+          onpointercancel: () => clearTimeout(_spaceLpTimer),
+          onclick: () => { if (_spaceLpFired) { _spaceLpFired = false; return; } handleT9Space(); },
+        }, 'SPACE'),
         m('button.kb-key.kb-submit', { ...NOMOUSEDOWN, onclick: handleT9Submit }, '\u23CE'),
       ]),
     ]);
