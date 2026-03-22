@@ -216,6 +216,86 @@ window._kbLoaded = true;
 // ── Key map ───────────────────────────────────────────────────────────────────
 // Each entry: [primaryChar, altChar]. 4 letter rows of 5 keys each.
 // Alt layer mirrors the right half of QWERTY (folded-keyboard layout).
+//
+// ── Design note: mirrored layout vs sequential two-char-per-key ──────────────
+//
+// Current layout: mirrored half-QWERTY
+//   (q,p)  (w,o)  (e,i)  (r,u)  (t,y)
+//   (a,;)  (s,l)  (d,k)  (f,j)  (g,h)
+//   (z,/)  (x,.)  (c,,)  (v,m)  (b,n)
+//
+// Proposed layout: sequential two-char-per-key
+//   (q,w)  (e,r)  (t,y)  (u,i)  (o,p)
+//   (a,s)  (d,f)  (g,h)  (j,k)  (l,;)
+//   (z,x)  (c,v)  (b,n)  (m,?)  ...
+//
+// MERITS OF SEQUENTIAL LAYOUT
+//
+//   1. Simpler mental model — the rule is just "adjacent QWERTY pairs".
+//      No concept of "mirroring" or "folding" is needed. A user can
+//      derive the full layout from one sentence.
+//
+//   2. Visual predictability — the keys read left-to-right in QWERTY order
+//      so locating a letter is O(glance): just find roughly where it falls
+//      on the alphabet strip and look at the nearest key.
+//
+//   3. No prerequisite knowledge — the mirrored layout pays off only for
+//      users who already have QWERTY muscle memory. On a touch keyboard
+//      muscle memory is irrelevant, so that advantage disappears. Sequential
+//      pairing is equally learnable by anyone.
+//
+//   4. Consistent mechanical rule — every key N covers characters 2N-1 and
+//      2N of the row, making it straightforward to build tooling, docs, or
+//      onboarding text around the layout.
+//
+// MERITS OF THE CURRENT MIRRORED LAYOUT
+//
+//   1. Half-QWERTY heritage — the folded layout is a studied design (Matias
+//      et al. 1993). It was shown that QWERTY typists can transfer skill to
+//      a one-handed layout quickly when the mirror axis preserves the
+//      spatial relationships they already know.
+//
+//   2. Reduces same-key collisions for some common digraphs — because
+//      mirroring pairs characters that are far apart on the row (q↔p, w↔o,
+//      e↔i, r↔u) rather than adjacent ones, some common English letter pairs
+//      that sit next to each other on QWERTY (e.g. "er", "as", "gh") end
+//      up on *different* keys, reducing T9 ambiguity for those words.
+//
+// KEY TRADE-OFF: T9 AMBIGUITY
+//
+//   Both layouts are T9-style — one key press per character, with the
+//   prediction engine resolving which of the two characters was intended.
+//   The layouts differ in which letter pairs collide on the same key.
+//
+//   Sequential collisions on the letter row include:
+//     (e,r) — "her", "there", "were", "every", "over"  ← very high frequency
+//     (g,h) — "high", "night", "right", "through"
+//     (u,i) — "guide", "quite", "fruit"
+//
+//   Mirrored collisions on the letter row include:
+//     (e,i) — "their", "being", "receive", "achieve"   ← very high frequency
+//     (r,u) — "run", "our", "your", "ruin"
+//     (t,y) — shared by both layouts (same key either way)
+//
+//   Neither layout eliminates high-frequency collisions. The prediction
+//   engine handles them in both cases. For a note-taking app where the
+//   dictionary covers common words well, the disambiguation quality is
+//   roughly equivalent between the two approaches.
+//
+// VERDICT FOR THIS APP
+//
+//   Sequential pairing is the stronger choice here because:
+//
+//     a) This is a touch UI — muscle memory arguments don't apply.
+//     b) The simpler mental model lowers the barrier for new users.
+//     c) The T9 prediction quality is not meaningfully worse.
+//     d) Left-to-right visual ordering maps to how users scan a keyboard.
+//
+//   The main cost is that "er" collisions become slightly more frequent,
+//   but given that the suggestion bar surfaces ranked candidates, the user
+//   rarely needs to resolve ambiguity manually. The learnability win
+//   outweighs the marginal increase in same-key digraph frequency.
+//
 const T9_KEYS = [
   ['1','0'], ['2','9'], ['3','8'], ['4','7'], ['5','6'],
   ['q','p'], ['w','o'], ['e','i'], ['r','u'], ['t','y'],
