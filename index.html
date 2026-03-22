@@ -294,9 +294,6 @@
   <div id="app"></div>
 
   <script>
-    // Set to false to disable the custom keyboard and use the OS keyboard instead.
-    const CUSTOM_KEYBOARD = true;
-
     // IndexedDB setup
     const DB_NAME = 'snot';
     const DB_VERSION = 4;
@@ -392,10 +389,20 @@
       });
     }
 
-    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL', 'new-state': 'INBOX', 'active-state': 'TODO', 'success-state': 'DONE' };
+    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL', 'new-state': 'INBOX', 'active-state': 'TODO', 'success-state': 'DONE', 'enable-keyboard': true };
     const userConfig = {};
 
     let dictWords = [];
+
+    // If keyboard.js failed to load, define a no-op so callers don't throw.
+    if (typeof resetKbState === 'undefined') window.resetKbState = () => {};
+
+    // True only when keyboard.js loaded successfully AND the config allows it.
+    function kbEnabled() {
+      const cfg = userConfig['enable-keyboard'];
+      const enabled = cfg !== undefined ? cfg : CONFIG_DEFAULTS['enable-keyboard'];
+      return !!window._kbLoaded && !!enabled;
+    }
 
     const state = {
       pairs: [],
@@ -648,6 +655,13 @@
             results.push(`${k} set to ${val}`);
             continue;
           }
+          if (k === 'enable-keyboard') {
+            const val = args[k] === 'true' || args[k] === '1';
+            userConfig[k] = val;
+            if (db) dbConfigPut(k, val);
+            results.push(`${k} set to ${val}`);
+            continue;
+          }
           if (k === 'default-state' || k === 'new-state' || k === 'active-state' || k === 'success-state') {
             const val = args[k].toUpperCase();
             userConfig[k] = val;
@@ -893,14 +907,14 @@
         const menu = state.note_menu;
         const menuNote = menu && state.notes.find(n => n.id === menu.noteId);
         return m('main', [
-          CUSTOM_KEYBOARD ? m(CustomKeyboard) : null,
+          kbEnabled() ? m(CustomKeyboard) : null,
           m('#input-row', [
             m('#input-wrapper', [
               m('input', {
                 type: 'text',
                 placeholder: 'Type a note or /command...',
                 value: state.input,
-                ...(CUSTOM_KEYBOARD ? {
+                ...(kbEnabled() ? {
                   inputmode: 'none',
                   onfocus: () => { state.kb_visible = true; m.redraw(); },
                   onblur: () => { setTimeout(() => { state.kb_visible = false; m.redraw(); }, 150); },

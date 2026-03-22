@@ -1,3 +1,5 @@
+window._kbLoaded = true;
+
 // Custom T9-style half-QWERTY keyboard for snot.
 // Loaded as a separate script before the main app script.
 // Exposes globals: T9_KEYS, CHAR_TO_KEY, SEED_WORDS, WORD_FREQ,
