@@ -215,7 +215,7 @@ window._kbLoaded = true;
 
 // ── Key map ───────────────────────────────────────────────────────────────────
 // Each entry: [primaryChar, altChar]. 4 letter rows of 5 keys each.
-// Alt layer mirrors the right half of QWERTY (folded-keyboard layout).
+// Alt layer uses sequential adjacent-pair QWERTY layout.
 //
 // ── Design note: mirrored layout vs sequential two-char-per-key ──────────────
 //
@@ -297,10 +297,10 @@ window._kbLoaded = true;
 //   outweighs the marginal increase in same-key digraph frequency.
 //
 const T9_KEYS = [
-  ['1','0'], ['2','9'], ['3','8'], ['4','7'], ['5','6'],
-  ['q','p'], ['w','o'], ['e','i'], ['r','u'], ['t','y'],
-  ['a',';'], ['s','l'], ['d','k'], ['f','j'], ['g','h'],
-  ['z','/'], ['x','.'], ['c',','], ['v','m'], ['b','n'],
+  ['1','2'], ['3','4'], ['5','6'], ['7','8'], ['9','0'],
+  ['q','w'], ['e','r'], ['t','y'], ['u','i'], ['o','p'],
+  ['a','s'], ['d','f'], ['g','h'], ['j','k'], ['l',';'],
+  ['z','x'], ['c','v'], ['b','n'], ['m',','], ['.','/'],
 ];
 
 const CHAR_TO_KEY = {};
