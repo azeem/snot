@@ -565,6 +565,27 @@ function getInputEl() {
   return document.querySelector('#input-wrapper input');
 }
 
+// Last known cursor position in the input element. Updated both by
+// selectionchange (user tap to reposition) and by replaceInInput (keyboard
+// actions). Used as a fallback when el.selectionStart is unreliable due to
+// the input being temporarily unfocused after a pointerdown on a key button.
+let _lastKnownCursor = 0;
+document.addEventListener('selectionchange', () => {
+  const el = getInputEl();
+  if (el && document.activeElement === el) {
+    _lastKnownCursor = el.selectionStart || 0;
+  }
+});
+
+// Returns the current cursor position in the input. When the input is focused
+// this is el.selectionStart; when it is temporarily unfocused (e.g. a keyboard
+// button captured focus before mousedown.preventDefault ran) we fall back to
+// the last saved position.
+function getInputCursor() {
+  const el = getInputEl();
+  return (el && document.activeElement === el) ? el.selectionStart : _lastKnownCursor;
+}
+
 // Replace [start, end) in the real input DOM element with `text`, then fire a
 // synthetic input event so Mithril's handleInput runs (updates state.input,
 // manages autocomplete, etc.).  We save the resulting cursor position so that
@@ -573,6 +594,7 @@ function replaceInInput(text, start, end) {
   const el = getInputEl();
   if (!el) return;
   el.setRangeText(text, start, end, 'end');
+  _lastKnownCursor = el.selectionStart;
   state.kb_cursor_pos = el.selectionStart;
   el.dispatchEvent(new Event('input', { bubbles: true }));
 }
@@ -591,7 +613,12 @@ function resetKbState() {
 }
 
 // Prevents focus leaving the input when tapping keyboard buttons.
-const NOMOUSEDOWN = { onmousedown: e => e.preventDefault() };
+// onpointerdown is needed for mobile where focus transfer happens at pointerdown,
+// before the synthetic mousedown fires.
+const NOMOUSEDOWN = {
+  onmousedown: e => e.preventDefault(),
+  onpointerdown: e => e.preventDefault(),
+};
 
 // Long-press state for the space key.
 let _spaceLpTimer = null;
@@ -687,8 +714,7 @@ function handleNumKey(keyIdx) {
     replaceInInput(word, state.kb_input_offset, state.kb_input_offset + wordLen);
     resetKbState();
   }
-  const el = getInputEl();
-  const pos = el ? el.selectionStart : state.input.length;
+  const pos = getInputCursor();
   const ch = NUM_LAYER_KEYS[keyIdx][state.kb_alt_mode ? 1 : 0];
   replaceInInput(ch, pos, pos);
   state.kb_alt_mode = false;
@@ -701,8 +727,7 @@ function handleT9CapsMode() {
 }
 
 function handleT9Key(keyIdx) {
-  const el = getInputEl();
-  if (state.kb_sequence.length === 0) state.kb_input_offset = el ? el.selectionStart : state.input.length;
+  if (state.kb_sequence.length === 0) state.kb_input_offset = getInputCursor();
   const prevLen = state.kb_sequence.length;
   state.kb_sequence.push(keyIdx);
   state.kb_alt_seq.push(state.kb_alt_mode);
@@ -723,8 +748,7 @@ function handleT9Backspace() {
     updateT9Suggestions();
     replaceInInput(getRawWord(), state.kb_input_offset, state.kb_input_offset + prevLen);
   } else {
-    const el = getInputEl();
-    const pos = el ? el.selectionStart : state.input.length;
+    const pos = getInputCursor();
     if (pos > 0) replaceInInput('', pos - 1, pos);
   }
   m.redraw();
@@ -738,8 +762,7 @@ function handleT9Space() {
     replaceInInput(word + ' ', state.kb_input_offset, state.kb_input_offset + wordLen);
     resetKbState();
   } else {
-    const el = getInputEl();
-    const pos = el ? el.selectionStart : state.input.length;
+    const pos = getInputCursor();
     replaceInInput(' ', pos, pos);
   }
   m.redraw();
