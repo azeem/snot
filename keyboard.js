@@ -218,9 +218,9 @@ window._kbLoaded = true;
 // Alt layer mirrors the right half of QWERTY (folded-keyboard layout).
 const T9_KEYS = [
   ['1','0'], ['2','9'], ['3','8'], ['4','7'], ['5','6'],
-  ['q','p'], ['w','o'], ['e','i'], ['r','u'], ['t','y'],
-  ['a',';'], ['s','l'], ['d','k'], ['f','j'], ['g','h'],
-  ['z','/'], ['x','.'], ['c',','], ['v','m'], ['b','n'],
+  ['q','w'], ['e','r'], ['t','y'], ['u','i'], ['o','p'],
+  ['a','s'], ['d','f'], ['g','h'], ['j','k'], ['l',';'],
+  ['z','x'], ['c','v'], ['b','n'], ['m',','], ['.','/'],
 ];
 
 const CHAR_TO_KEY = {};
