@@ -6,7 +6,6 @@
   <title>snot</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <script src="https://cdn.jsdelivr.net/npm/mithril@2/mithril.min.js"></script>
-  <script src="keyboard.js"></script>
   <style>
     body {
       max-width: 720px;
@@ -299,7 +298,6 @@
     const DB_VERSION = 6;
     const STORE_NAME = 'notes';
     const CONFIG_STORE_NAME = 'config';
-    const DICT_STORE = 'dictionary';
     let db = null;
 
     function openDB() {
@@ -312,12 +310,6 @@
             d.createObjectStore(STORE_NAME, { keyPath: 'id' });
           if (!d.objectStoreNames.contains(CONFIG_STORE_NAME))
             d.createObjectStore(CONFIG_STORE_NAME, { keyPath: 'key' });
-          if (!d.objectStoreNames.contains(DICT_STORE))
-            d.createObjectStore(DICT_STORE, { keyPath: 'word' });
-          if (e.oldVersion < 6 && window._kbLoaded) {
-            const store = tx.objectStore(DICT_STORE);
-            SEED_WORDS.trim().split(/\s+/).filter(Boolean).forEach(w => store.put({ word: w }));
-          }
         };
         req.onsuccess = e => resolve(e.target.result);
         req.onerror = e => reject(e.target.error);
@@ -362,35 +354,8 @@
       });
     }
 
-    function dbDictGetAll() {
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(DICT_STORE, 'readonly');
-        const req = tx.objectStore(DICT_STORE).getAll();
-        req.onsuccess = e => resolve(e.target.result.map(r => r.word));
-        req.onerror = e => reject(e.target.error);
-      });
-    }
-
-    function dbDictPut(word) {
-      const tx = db.transaction(DICT_STORE, 'readwrite');
-      tx.objectStore(DICT_STORE).put({ word });
-    }
-
-
-    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL', 'new-state': 'INBOX', 'active-state': 'TODO', 'success-state': 'DONE', 'enable-keyboard': false };
+    const CONFIG_DEFAULTS = { 'list-limit': 10, 'startup': '/list', 'state-names': 'INBOX,TODO,DONE,ARCHIVE', 'default-state': 'NULL', 'new-state': 'INBOX', 'active-state': 'TODO', 'success-state': 'DONE' };
     const userConfig = {};
-
-    let dictWords = [];
-
-    // If keyboard.js failed to load, define a no-op so callers don't throw.
-    if (typeof resetKbState === 'undefined') window.resetKbState = () => {};
-
-    // True only when keyboard.js loaded successfully AND the config allows it.
-    function kbEnabled() {
-      const cfg = userConfig['enable-keyboard'];
-      const enabled = cfg !== undefined ? cfg : CONFIG_DEFAULTS['enable-keyboard'];
-      return !!window._kbLoaded && !!enabled;
-    }
 
     const state = {
       pairs: [],
@@ -402,17 +367,6 @@
       note_menu: null,
       collapsing: null,
       toast: null,
-      kb_visible: false,
-      kb_sequence: [],
-      kb_alt_seq: [],
-      kb_alt_mode: false,
-      kb_caps_seq: [],
-      kb_caps_mode: false,
-      kb_suggestions: [],
-      kb_exact_count: 0,
-      kb_input_offset: 0,
-      kb_cursor_pos: undefined,
-      kb_num_layer: false,
     };
 
     let _toastTimer = null;
@@ -646,13 +600,6 @@
             results.push(`${k} set to ${val}`);
             continue;
           }
-          if (k === 'enable-keyboard') {
-            const val = args[k] === 'true' || args[k] === '1';
-            userConfig[k] = val;
-            if (db) dbConfigPut(k, val);
-            results.push(`${k} set to ${val}`);
-            continue;
-          }
           if (k === 'default-state' || k === 'new-state' || k === 'active-state' || k === 'success-state') {
             const val = args[k].toUpperCase();
             userConfig[k] = val;
@@ -825,10 +772,6 @@
     }
 
     function handleSubmit() {
-      if (state.kb_sequence.length > 0) {
-        state.input = (state.input + getRawWord()).trim();
-        resetKbState();
-      }
       const input = state.input.trim().replace(/[\u201C\u201D]/g, '"');
       if (!input) return;
 
@@ -836,8 +779,6 @@
       dismissAutocomplete();
       state.show_welcome = false;
       state.input = '';
-      resetKbState();
-      state.kb_visible = false;
       state.collapsing = null;
 
       if (input.startsWith('/')) {
@@ -885,8 +826,6 @@
       }
     }
 
-    // CustomKeyboard component and all T9 helpers are defined in keyboard.js.
-
     const App = {
       oncreate() {
         document.addEventListener('click', () => {
@@ -898,26 +837,12 @@
         const menu = state.note_menu;
         const menuNote = menu && state.notes.find(n => n.id === menu.noteId);
         return m('main', [
-          kbEnabled() ? m(CustomKeyboard) : null,
           m('#input-row', [
             m('#input-wrapper', [
               m('input', {
                 type: 'text',
                 placeholder: 'Type a note or /command...',
                 value: state.input,
-                ...(kbEnabled() ? {
-                  inputmode: 'none',
-                  onfocus: () => { state.kb_visible = true; m.redraw(); },
-                  onblur: () => { setTimeout(() => { state.kb_visible = false; resetKbState(); m.redraw(); }, 150); },
-                  onupdate: vnode => {
-                    const el = vnode.dom;
-                    if (state.kb_cursor_pos !== undefined) {
-                      el.setSelectionRange(state.kb_cursor_pos, state.kb_cursor_pos);
-                      state.kb_cursor_pos = undefined;
-                    }
-                    el.scrollLeft = el.scrollWidth;
-                  },
-                } : {}),
                 oninput: handleInput,
                 onkeydown: handleKeydown,
               }),
@@ -930,11 +855,10 @@
                   ))
                 : null,
             ]),
-            state.input || state.kb_sequence.length ? m('button#clear-btn', {
+            state.input ? m('button#clear-btn', {
               onmousedown: e => e.preventDefault(),
               onclick: () => {
                 state.input = '';
-                resetKbState();
                 state.collapsing = null;
                 dismissAutocomplete();
                 document.querySelector('#input-row input').focus();
@@ -1001,11 +925,10 @@
 
     openDB().then(database => {
       db = database;
-      return Promise.all([dbGetAll(), dbConfigGetAll(), dbDictGetAll()]);
-    }).then(([notes, configRows, words]) => {
+      return Promise.all([dbGetAll(), dbConfigGetAll()]);
+    }).then(([notes, configRows]) => {
       state.notes = notes.sort((a, b) => a.created_at - b.created_at);
       configRows.forEach(row => { userConfig[row.key] = row.value; });
-      dictWords = words;
       const startupCmd = userConfig['startup'] !== undefined ? userConfig['startup'] : CONFIG_DEFAULTS['startup'];
       if (startupCmd) {
         state.show_welcome = false;
